@@ -5,7 +5,7 @@ import { SphereDistribution } from "./distributions/SphereDistribution";
 import { Distribution } from "./distributions/Distribution";
 import { ActivationWindow } from "./ActivationWindow";
 import { TextureName } from "./constants/textures";
-import { Modifier } from "./modifiers/Modifier";
+import { Modifiers } from "./modifiers/Modifiers";
 
 export interface EmitterSpawn {
     spawnRate: number;
@@ -42,7 +42,7 @@ export class Emitter {
             new Vector3( 0, 0, 0 ),
         ),
     };
-    velocityModifiers: Modifier[] = [];
+    velocityModifiers: Modifiers = new Modifiers();
     activationWindow: ActivationWindow;
 
     // Temporary parameters to control SimplexNoise.

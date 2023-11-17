@@ -192,6 +192,7 @@ vec3 calculateNoiseVelocity( vec3 currentPosition, vec4 uNoiseParamsValue, vec3 
 
     for (int i = 0; i < OCTAVES; ++i) {
         float octaveValue = pow( 2.0, float( i ) );
+        // float octaveValue = float( 1 << i );
         float scale = (1.0 / 2.0) * octaveValue;
 
         float noiseScale = pow(uNoiseTurbulance, float(i));

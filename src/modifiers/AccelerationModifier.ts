@@ -1,21 +1,14 @@
-import { IUniform, Vector3 } from 'three';
+import { Vector3 } from 'three';
 import { Modifier } from './Modifier';
 
-export class AccelerationModifier extends Modifier {
+export class AccelerationModifier extends Modifier<Vector3> {
+    bitFlag = 1 << 0;
+
     defines = {
         MOD_ACCELERATION: true
     };
 
-    uniforms: Record<string, IUniform<Vector3 | null>> = {
-        uModAcceleration: { value: null }
-    };
-
-    value: Vector3;
-
     constructor( value: Vector3 ) {
-        super();
-
-        this.value = value;
-        this.uniforms.uModAcceleration.value = this.value;
+        super( value, 'uModAcceleration' );
     }
 }

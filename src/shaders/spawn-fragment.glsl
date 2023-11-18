@@ -8,9 +8,10 @@ uniform vec2 uTime;
 // uniform sampler2D tSpawn;
 
 // Control uniforms
-uniform float[ EMITTER_COUNT ] uSpawnRate;
-uniform float[ EMITTER_COUNT ] uBurstRate;
-uniform float[ EMITTER_COUNT ] uMaxAge;
+// uniform float[ EMITTER_COUNT ] uSpawnRate;
+// uniform float[ EMITTER_COUNT ] uBurstRate;
+// uniform float[ EMITTER_COUNT ] uMaxAge;
+uniform vec4[ EMITTER_COUNT ] uSpawnValue;
 uniform bool[ EMITTER_COUNT ] uEmitterActive;
 
 /*
@@ -24,8 +25,8 @@ uniform bool[ EMITTER_COUNT ] uEmitterActive;
         vec2( 10, 19 )
     ]
 */
-uniform vec2[ EMITTER_COUNT ] uEmitterIndexRanges;
-uniform vec2[ EMITTER_COUNT ] uActivationWindow;
+uniform vec2[ EMITTER_COUNT ] uEmitterIndexRange;
+// uniform vec2[ EMITTER_COUNT ] uActivationWindow;
 
 
 /**
@@ -35,33 +36,13 @@ uniform vec2[ EMITTER_COUNT ] uActivationWindow;
  * is within the `emitterIndexRange`.
  */
 bool withinEmitterRange( vec2 emitterIndexRange, float particleIndex ) {
-    float indexStart = emitterIndexRange.x;
+    float indexInclusiveStart = emitterIndexRange.x;
     float indexInclusiveEnd = emitterIndexRange.y;
 
     return (
-        particleIndex >= indexStart &&
+        particleIndex >= indexInclusiveStart &&
         particleIndex <= indexInclusiveEnd
     );
-}
-
-vec2 getWindow( int emitterIndex, float numParticles ) {
-    float spawnRate = uSpawnRate[ emitterIndex ];
-    float burstRate = uBurstRate[ emitterIndex ];
-    float deltaTime = uTime.x;
-    float runTime = uTime.y;
-
-
-    float start = floor(spawnRate * runTime );
-    start *= burstRate;
-    start = mod( start, numParticles );
-
-    float particlesPerTick = round( spawnRate * deltaTime );
-    // float particlesPerTick = 0.0;
-
-    float end = start + burstRate + particlesPerTick;
-    end = mod( end, numParticles );
-
-    return vec2( start, end );
 }
 
 bool withinActivationWindow( vec2 window, float index ) {
@@ -76,13 +57,41 @@ bool withinActivationWindow( vec2 window, float index ) {
     }
 }
 
+vec2 getSpawnWindow( vec4 spawnValue, vec2 emitterIndexRange, float totalParticleCount ) {
+    float deltaTime = uTime.x;
+    float runTime = uTime.y;
+    float spawnRate = spawnValue.x;
+    float burstRate = spawnValue.y;
+    // float maxAge = spawnValue.z;
+    float emitterParticleCount = spawnValue.w;
+
+    float start = floor( spawnRate * runTime ) * burstRate;
+    start = mod( start, emitterParticleCount );
+    
+    float particlesPerTick = floor( spawnRate * deltaTime );
+    // float particlesPerTick = 0.0;
+
+    float end = ( start + burstRate + particlesPerTick );
+    end = mod( end, emitterParticleCount );
+
+    return vec2(
+        mod( emitterIndexRange.x + start, totalParticleCount ),
+        mod( emitterIndexRange.x + end, totalParticleCount )
+    );
+    // return spawnWindow;
+
+    // return vec2( start, end );
+}
+
 void main() {
     // Unpack time uniform
     float deltaTime = uTime.x;
     float runTime = uTime.y;
+    float totalParticleCount = resolution.x * resolution.y;
 
     // Calculate the uv coords for this particle.
     vec2 uv = gl_FragCoord.xy / resolution.xy;
+
 
     // Read values from the spawn texture
     vec4 spawnTextureValue = texture2D( tSpawn, uv );
@@ -93,17 +102,29 @@ void main() {
 
     // Loop through all emitters...
     for( int i = 0; i < EMITTER_COUNT; ++i ) {
-        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRanges[ i ], particleIndex );
+        vec4 spawnValue = uSpawnValue[ i ];
+        vec2 emitterIndexRange = uEmitterIndexRange[ i ];
+
+        bool isWithinEmitterRange = withinEmitterRange( emitterIndexRange, particleIndex );
+
+        bool emitterActive = uEmitterActive[ i ];
+        vec2 spawnWindow = getSpawnWindow(
+            spawnValue,
+            emitterIndexRange,
+            totalParticleCount
+        );
 
         // If the current particleIndex does not fall within this emitter range,
         // continue on with the loop.
-        if( isWithinEmitterRange == false ) {
+        if( isWithinEmitterRange == false || emitterActive == false ) {
             continue;
         }
 
+        bool withinWindow = withinActivationWindow( spawnWindow, particleIndex );
+
         // TODO:
         // Continue moving the activationWindow calculation into this shader.
-        // vec2 w = getWindow( i, uEmitterIndexRanges[ i ].y - uEmitterIndexRanges[ i ].x );
+        // vec2 w = getWindow( i, emitterIndexRange.y - emitterIndexRange.x );
 
         // TODO:
         // There's an issue with particles running over each other, removing the alive
@@ -113,7 +134,7 @@ void main() {
         //   Is this an issue with the order the GPUComputationRenderer is rendering the textures?
         //
         // if( alive == 0.0 && withinActivationWindow( uActivationWindow[ i ], particleIndex ) ) {
-        if( withinActivationWindow( uActivationWindow[ i ], particleIndex ) && uEmitterActive[ i ] ) {
+        if( withinWindow ) {
             alive = 1.0;
             age = 0.0;
 
@@ -121,13 +142,13 @@ void main() {
             // - 
             // maxAge = maxAge;
         }
-        else if( alive == 1.0 ) {
+        else if( alive == 1.0 && age < maxAge ) {
             age += deltaTime;
         }
-
-        if( age > maxAge ) {
+        else if( alive == 1.0 && age >= maxAge ) {
             alive = 0.0;
             age = 0.0;
+            // maxAge = spawnValue.z;
         }
     }
 

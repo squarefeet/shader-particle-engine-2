@@ -33,7 +33,7 @@ controls.dampingFactor = 0.05;
 
 // Setup those bits n bobs
 camera.position.y = 0;
-camera.position.z = 1100;
+camera.position.z = 51;
 camera.lookAt( new Vector3( 0, 0, 0 ) );
 stats.showPanel( 0 );
 

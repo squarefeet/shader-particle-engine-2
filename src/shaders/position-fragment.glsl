@@ -9,7 +9,7 @@ uniform vec2 uTime;
 // uniform sampler2D tVelocity;
 // uniform sampler2D tSpawn;
 
-uniform vec2[EMITTER_COUNT] uEmitterIndexRanges;
+uniform vec2[EMITTER_COUNT] uEmitterIndexRange;
 uniform vec3[EMITTER_COUNT] uInitialOrigin;
 uniform vec3[EMITTER_COUNT] uDistributionMin;
 uniform vec3[EMITTER_COUNT] uDistributionMax;
@@ -111,14 +111,8 @@ vec3 randomLineDistribution( float seed, vec3 startPosition, vec3 endPosition ) 
  * Set a particle's initial value if it's just been born.
  */
 vec3 getInitialValue( vec3 initialValue, float seed, vec3 minSize, vec3 maxSize, int distType ) {
-    // NONE
-    if( distType == 0 ) {
-        // return initialValue;
-        return vec3( 100.0 );
-    }
-
     // RANDOM
-    else if( distType == 1 ) {
+    if( distType == 1 ) {
         return initialValue;
     }
 
@@ -139,7 +133,7 @@ vec3 getInitialValue( vec3 initialValue, float seed, vec3 minSize, vec3 maxSize,
         return initialValue + randomLineDistribution( seed, minSize, maxSize );
     }
 
-    return vec3( 1000.0 );
+    return initialValue;
 }
 
 vec3 applyModifiers( vec3 position, vec3 velocity, vec4 spawn ) {
@@ -161,7 +155,7 @@ vec3 applyModifiers( vec3 position, vec3 velocity, vec4 spawn ) {
 
     // Loop through all emitters...
     for( int i = 0; i < EMITTER_COUNT; ++i ) {
-        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRanges[ i ], particleIndex );
+        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRange[ i ], particleIndex );
 
         // If the current particleIndex does not fall within this emitter range,
         // continue on with the loop.
@@ -180,6 +174,8 @@ vec3 applyModifiers( vec3 position, vec3 velocity, vec4 spawn ) {
                 uDistributionMax[ i ],
                 uDistributionType[ i ]
             );
+
+            // position = vec3(0.0);
         }
 
         // Particle is alive, so apply the relevant forces

@@ -1,11 +1,11 @@
-import { Vector3, Vector4 } from "three";
+import { IUniform, Vector2, Vector3, Vector4 } from "three";
 import { RandomDistribution } from "./distributions/RandomDistribution";
 import { BoxDistribution } from "./distributions/BoxDistribution";
 import { SphereDistribution } from "./distributions/SphereDistribution";
 import { Distribution } from "./distributions/Distribution";
-import { ActivationWindow } from "./ActivationWindow";
 import { TextureName } from "./constants/textures";
 import { Modifiers } from "./modifiers/Modifiers";
+import { Modifier } from "./modifiers/Modifier";
 
 export interface EmitterSpawn {
     spawnRate: number;
@@ -23,11 +23,16 @@ let ID = 0;
 export class Emitter {
     id: number = ID++;
     active: boolean = true;
+    
+    time: number = 0;
+    particleCountChanged: boolean = false;
+
     spawn: EmitterSpawn = {
         spawnRate: 1,
         burstRate: 1,
         maxAge: 1,
     };
+
     positionInitial: EmitterInitial<Vector3> = {
         origin: new Vector3( 0, 0, 0 ),
         distribution: new BoxDistribution(
@@ -37,13 +42,29 @@ export class Emitter {
     };
     velocityInitial: EmitterInitial<Vector3> = {
         origin: new Vector3( 0, 0, 0 ),
-        distribution: new SphereDistribution(
+        distribution: new BoxDistribution(
             new Vector3( 0, 0, 0 ),
             new Vector3( 0, 0, 0 ),
         ),
     };
     velocityModifiers: Modifiers = new Modifiers();
-    activationWindow: ActivationWindow;
+    // activationWindow: ActivationWindow;
+
+
+
+    uniforms: Record<string, IUniform> = {
+        uActivationWindow: {
+            value: new Vector2( 0, 0 ),
+        },
+        uEmitterIndexRange: {
+            value: new Vector2( 0, 0 ),
+        },
+        uSpawnValue: {
+            value: new Vector4( 0, 0, 0, 0 ),
+        },
+    };
+
+    
 
     // Temporary parameters to control SimplexNoise.
     // TODO:
@@ -62,10 +83,54 @@ export class Emitter {
     );
 
     constructor( spawnRate: number, burstRate: number, maxAge: number ) {
-        this.activationWindow = new ActivationWindow( spawnRate, burstRate, maxAge );
+        this.spawnRate = spawnRate;
+        this.burstRate = burstRate;
+        this.maxAge = maxAge;
     }
 
-    get uniforms() {
+    get spawnRate() {
+        return this.uniforms.uSpawnValue.value.x;
+    }
+    set spawnRate( rate: number ) {
+        this.uniforms.uSpawnValue.value.x = Math.max( 0.01, rate );
+        this.updateParticleCount();
+    }
+
+    get burstRate() {
+        return this.uniforms.uSpawnValue.value.y;
+    }
+    set burstRate( rate: number ) {
+        this.uniforms.uSpawnValue.value.y = Math.max( 1, rate );
+        this.updateParticleCount();
+    }
+
+    get maxAge() {
+        return this.uniforms.uSpawnValue.value.z;
+    }
+    set maxAge( age: number ) {
+        this.uniforms.uSpawnValue.value.z = Math.max( 0.01, age );
+        this.updateParticleCount();
+    }
+
+    get particleCount() {
+        return this.uniforms.uSpawnValue.value.w;
+    }
+    set particleCount( count: number ) {
+        this.uniforms.uSpawnValue.value.w = count;
+    }
+
+    private updateParticleCount() {
+        const previousParticleCount = this.particleCount;
+
+        this.particleCount = Math.max(
+            4,
+            Math.ceil( this.spawnRate ) * Math.ceil( this.burstRate ) * Math.ceil( this.maxAge )
+        );
+
+        this.particleCountChanged = previousParticleCount !== this.particleCount;
+    }
+
+    get uniformsMap() {
         const velocityModifierUniforms = {
             uNoiseParams: this.tempNoiseParams,
             uNoiseScale: this.tempNoiseScale,
@@ -96,11 +161,20 @@ export class Emitter {
         return {};
     }
 
-    addVelocityModifier( modifier: Modifier ) {
-        this.velocityModifiers.push( modifier );
+    addVelocityModifier( modifier: Modifier<unknown> ) {
+        this.velocityModifiers.add( modifier );
     }
 
-    update( deltaTime: number, numParticles: number ) {
-        this.activationWindow.update( deltaTime, numParticles );
+    setIndexRange( startIndex: number ) {
+        this.uniforms.uEmitterIndexRange.value.set(
+            startIndex,
+            startIndex + this.particleCount - 1
+        );
+
+        this.particleCountChanged = false;
+    }
+
+    update( deltaTime: number, totalParticleCount: number ) {
+        // this.updateActivationWindow( deltaTime, totalParticleCount );
     }
 }

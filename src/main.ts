@@ -32,31 +32,34 @@ document.body.appendChild( stats.dom );
 const compute = new ParticleEngineCompute( renderer );
 
 // First emitter...
-const emitter0 = new Emitter( 1000, 1, 5 );
-emitter0.positionInitial.distribution = new LineDistribution(
-    new Vector3( -100, 0, 0 ),
-    new Vector3( 100, 0, 0 ),
-);
+const emitter0 = new Emitter( 3, 1, 2 );
+emitter0.positionInitial.origin.set( 50, 0, 0 );
 compute.addEmitter( emitter0 );
 
-// Second emitter...
-const emitter1 = new Emitter( 100, 1, 1 );
-emitter1.positionInitial.origin = new Vector3( 200, 0, 0 );
-emitter1.positionInitial.distribution = new SphereDistribution(
-    new Vector3( 50 ),
-    new Vector3( 50 ),
-);
-emitter1.velocityInitial.distribution = new SphereDistribution(
-    new Vector3( 100, 0, 0 ),
-    new Vector3( 100, 0, 0 ),
-);
+const emitter1 = new Emitter( 1, 1, 2 );
 compute.addEmitter( emitter1 );
+
+
+// Second emitter...
+// const emitter1 = new Emitter( 100, 1, 1 );
+// emitter1.positionInitial.origin = new Vector3( 200, 0, 0 );
+// emitter1.positionInitial.distribution = new SphereDistribution(
+//     new Vector3( 50 ),
+//     new Vector3( 50 ),
+// );
+// emitter1.velocityInitial.distribution = new SphereDistribution(
+//     new Vector3( 100, 0, 0 ),
+//     new Vector3( 100, 0, 0 ),
+// );
+// compute.addEmitter( emitter1 );
+
+compute.addDebugPlanesToScene( scene, 50 );
 
 // Generate attributes for the MeshRenderer and PointsRenderer
 compute.setPositionBufferAttribute();
 compute.setUVBufferAttribute();
 
-
+console.log( compute );
 
 // Begin lighting tests
 // --------------------
@@ -95,8 +98,8 @@ scene.add( hemiLight );
 
 
 
-const pointsRenderer = new PointsRenderer( compute );
-scene.add( pointsRenderer.mesh );
+// const pointsRenderer = new PointsRenderer( compute );
+// scene.add( pointsRenderer.mesh );
 
 const meshGeometry = new BoxGeometry( 10, 10, 10 );
 const meshRenderer = new MeshRenderer( compute, meshGeometry );
@@ -129,7 +132,7 @@ function tick( time: DOMHighResTimeStamp ) {
     compute.update( dt, manualTime );
 
     // Update both points and mesh renderers
-    pointsRenderer.update( dt, manualTime );
+    // pointsRenderer.update( dt, manualTime );
     meshRenderer.update( dt, manualTime, scene, camera );
 
     // Render the scene

@@ -20,13 +20,23 @@ uniform vec2 uTime;
         vec2( 10, 19 )
     ]
 */
-uniform vec2[EMITTER_COUNT] uEmitterIndexRanges;
+uniform vec2[EMITTER_COUNT] uEmitterIndexRange;
 
 // The following uniforms follow the same pattern...
 uniform vec3[EMITTER_COUNT] uInitialValue; // vec4( base.xyz, float distributionType )
 uniform vec3[EMITTER_COUNT] uDistributionMin;
 uniform vec3[EMITTER_COUNT] uDistributionMax;
 uniform int[EMITTER_COUNT] uDistributionType;
+
+uniform float[EMITTER_COUNT] uModBitMask;
+
+#ifdef MOD_ACCELERATION
+    uniform vec3[EMITTER_COUNT] uModAcceleration;
+#endif
+
+#ifdef MOD_DRAG
+    uniform vec3[EMITTER_COUNT] uModDrag;
+#endif
 
 /*
     Another array, this contains the values for
@@ -379,7 +389,7 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
     // Loop through all emitters...
     for( int i = 0; i < EMITTER_COUNT; ++i ) {
-        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRanges[ i ], particleIndex );
+        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRange[ i ], particleIndex );
 
         // If the current particleIndex does not fall within this emitter range,
         // continue on with the loop.
@@ -390,15 +400,16 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
         // Particle has just been born, so set its initial value
         if( particleIsNew( alive, age ) ) {
-            float seed = gl_FragCoord.y * resolution.x + gl_FragCoord.x;
-            velocity = getInitialValue(
-                uInitialValue[ i ],
-                seed,
-                uDistributionMin[ i ],
-                uDistributionMax[ i ],
-                uDistributionType[ i ],
-                position
-            );
+            // float seed = gl_FragCoord.y * resolution.x + gl_FragCoord.x;
+            // velocity = getInitialValue(
+            //     uInitialValue[ i ],
+            //     seed,
+            //     uDistributionMin[ i ],
+            //     uDistributionMax[ i ],
+            //     uDistributionType[ i ],
+            //     position
+            // );
+            velocity = vec3( 0.0, 15.0, 0.0 );
         }
 
         // Particle is alive, so apply the relevant forces
@@ -407,8 +418,10 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
             // velocity *= ( 1.0 - uDrag[ i ] );
             // velocity *= 0.97;
 
-            velocity += calculateNoiseVelocity( position, uNoiseParams[ i ], uNoiseScale[ i ] ) * deltaTime;
-            velocity.y -= 1.0;
+            velocity += vec3( 0.0, 0.0, 0.0 );
+
+            // velocity += calculateNoiseVelocity( position, uNoiseParams[ i ], uNoiseScale[ i ] ) * deltaTime;
+            // velocity.y -= 1.0;
             // velocity = min( vec3( 10.0 ), velocity );
 
             // velocity += vec3( 0.0, 0.0, 20.0 ) * deltaTime;

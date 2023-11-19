@@ -29,6 +29,7 @@ import { LineDistribution } from './distributions/LineDistribution';
 import { AccelerationModifier } from './modifiers/AccelerationModifier';
 import { SimplexNoiseModifier } from './modifiers/SimplexNoise';
 import { DragModifier } from './modifiers/DragModifier';
+import { BoxDistribution } from './distributions/BoxDistribution';
 
 document.body.appendChild( renderer.domElement );
 document.body.appendChild( stats.dom );
@@ -36,12 +37,16 @@ document.body.appendChild( stats.dom );
 const compute = new ParticleEngineCompute( renderer );
 
 // First emitter...
-// const emitter0 = new Emitter( 3, 1, 2 );
-// emitter0.positionInitial.origin.set( 50, 0, 0 );
-// // emitter0.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -10, 0 ) ) );
-// compute.addEmitter( emitter0 );
+const emitter0 = new Emitter( 10000, 1, 10 );
+emitter0.positionInitial.origin.set( 1000, 0, 0 );
+emitter0.velocityInitial.distribution = new SphereDistribution(
+    new Vector3( 100, 100, 100 ),
+    new Vector3( 100, 100, 100 ),
+);
+emitter0.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -10, 0 ) ) );
+compute.addEmitter( emitter0 );
 
-const emitter1 = new Emitter( 100000, 1, 10 );
+const emitter1 = new Emitter( 10000, 1, 10 );
 emitter1.positionInitial.distribution = new SphereDistribution(
     new Vector3( 50, 0, 0 ),
     new Vector3( 50, 0, 0 ),
@@ -57,7 +62,7 @@ emitter1.addVelocityModifier( new SimplexNoiseModifier(
 ) );
 // emitter1.addVelocityModifier( new DragModifier( 0.05 ) );
 emitter1.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -10, 0 ) ) );
-compute.addEmitter( emitter1 );
+// compute.addEmitter( emitter1 );
 
 
 // Second emitter...
@@ -73,7 +78,7 @@ compute.addEmitter( emitter1 );
 // );
 // compute.addEmitter( emitter1 );
 
-// compute.addDebugPlanesToScene( scene, 50 );
+compute.addDebugPlanesToScene( scene, 50 );
 
 // Generate attributes for the MeshRenderer and PointsRenderer
 compute.setPositionBufferAttribute();
@@ -141,8 +146,8 @@ function tick( time: DOMHighResTimeStamp ) {
     
     controls.update( dt );
 
-    camera.position.x = Math.sin( t * 0.5 ) * 1500;
-    camera.position.z = Math.cos( t * 0.5 ) * 1500;
+    // camera.position.x = Math.sin( t * 0.5 ) * 1500;
+    // camera.position.z = Math.cos( t * 0.5 ) * 1500;
 
     // Move the lights around...
     // testSphere.position.y = Math.sin( t * 0.6 ) * 500;

@@ -13,11 +13,13 @@ export class Modifier<T> {
         this.uniforms[ this.uniformName ] = this.uniformValue;
     }
 
-    get value(): T | null {
-        return this.uniformValue.value;
+    get value(): T {
+        return this.uniformValue.value as T;
     }
 
     set value( v: T ) {
         this.uniformValue.value = v;
     }
+
+    update( deltaTime: number, runTime: number ) {}
 }

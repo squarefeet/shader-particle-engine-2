@@ -49,6 +49,16 @@ export class Modifiers {
         this.clearBitFlag( modifier.bitFlag );
     }
 
+    generateDefines() {
+        return this.storage.reduce( ( defines, modifier ) => {
+            Object.entries( modifier.defines ).forEach( ( [ defineName, defineValue ] ) => {
+                defines[ defineName ] = defineValue;
+            } );
+
+            return defines;
+        }, {} as Record<string, unknown> );
+    }
+
     generateUniforms() {
         return this.storage.reduce( ( uniforms, modifier ) => {
             Object.entries( modifier.uniforms ).forEach( ( [ uniformName, value ] ) => {
@@ -57,5 +67,11 @@ export class Modifiers {
 
             return uniforms;
         }, {} as Record<string, IUniform>);
+    }
+    
+    update( deltaTime: number, runTime: number ) {
+        for( let i = 0, il = this.storage.length; i < il; ++i ) {
+            this.storage[ i ].update( deltaTime, runTime );
+        }
     }
 }

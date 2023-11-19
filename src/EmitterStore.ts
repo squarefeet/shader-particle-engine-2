@@ -1,5 +1,6 @@
 import { IUniform, Vector2, Vector3, Vector4 } from 'three';
 import { Emitter } from './Emitter';
+import { TextureName } from './constants/textures';
 
 export type UniformValue = (
     boolean |
@@ -15,7 +16,18 @@ export class EmitterStore {
     indexRanges: Vector2[] = [];
     particleCount: number = 0;
     requiredTextureSize: number = 0;
-    defines: Record<string, any> = {};
+    defines: Record<TextureName, any> = {
+        [ TextureName.SPAWN ]: {},
+        [ TextureName.VELOCITY ]: {},
+        [ TextureName.POSITION ]: {},
+    };
+
+    // uniforms: Record<TextureName, Record<string, IUniform<UniformValue[]>>> = {
+    //     [ TextureName.SPAWN ]: {},
+    //     [ TextureName.VELOCITY ]: {},
+    //     [ TextureName.POSITION ]: {},
+    // };
+
     uniformsSpawn: Record<string, IUniform<UniformValue[]>> = {
         uEmitterIndexRange: { value: [] },
         uActivationWindow: { value: [] },
@@ -27,12 +39,14 @@ export class EmitterStore {
         uInitialValue: { value: [] },
         uDistributionMin: { value: [] },
         uDistributionMax: { value: [] },
+        uDistributionType: { value: [] },
     };
 
     uniformsPosition: Record<string, IUniform<UniformValue[]>> = {    
         uInitialOrigin: { value: [] },
         uDistributionMin: { value: [] },
         uDistributionMax: { value: [] },
+        uDistributionType: { value: [] },
     };
 
     private updateEmitterIndices() {
@@ -62,6 +76,69 @@ export class EmitterStore {
         return this.store.some( d => !!d.velocityInitial.distribution );
     }
 
+    private assignModifierUniforms() {
+        const hasModifiers = this.store.some( d => {
+            return d.velocityModifiers.storage.length > 0;
+        } );
+
+        if( !hasModifiers ) {
+            return;
+        }
+
+        const modifierUniforms = this.store.reduce( ( uniforms, emitter, emitterIndex, emitterStore ) => {
+            const emitterUniforms = emitter.velocityModifiers.generateUniforms();
+
+            Object.keys( emitterUniforms ).forEach( name => {
+                uniforms[ name ] = uniforms[ name ] || { value: new Array( emitterStore.length ).fill( 0 ) };
+                uniforms[ name ].value[ emitterIndex ] = emitterUniforms[ name ].value;
+            } );
+
+            return uniforms;
+        }, {} as Record<string, IUniform> );
+
+        Object.values( modifierUniforms ).forEach( ( uniform: IUniform ) => {
+            const existingValue = uniform.value.find( ( d: unknown ) => !!d );
+            
+            uniform.value = uniform.value.map( ( d: unknown ) => {
+                if( d ) {
+                    return d;
+                }
+
+                switch( existingValue.constructor ) {
+                    case Vector2: return new Vector2( 0, 0 );
+                    case Vector3: return new Vector3( 0, 0, 0 );
+                    case Vector4: return new Vector4( 0, 0, 0, 0 );
+                    case Number: return 0;
+                    case Boolean: return false;
+                }
+            } );
+        } );
+
+        this.uniformsVelocity = {
+            ...this.uniformsVelocity,
+            ...modifierUniforms,
+        };
+    }
+
+    private assignModifierDefines() {
+        const hasModifiers = this.store.some( d => {
+            return d.velocityModifiers.storage.length > 0;
+        } );
+
+        if( !hasModifiers ) {
+            return;
+        }
+
+        this.defines[ TextureName.VELOCITY ] = this.store.reduce( ( defines, emitter ) => {
+            const emitterDefines = emitter.velocityModifiers.generateDefines();
+
+            return {
+                ...defines,
+                ...emitterDefines,
+            };
+        }, {} as Record<string, unknown> );
+    }
+
     add( emitter: Emitter ) {
         this.store.push( emitter );
 
@@ -70,6 +147,8 @@ export class EmitterStore {
 
         this.updateEmitterIndices();
         this.calculateTextureSize();
+        this.assignModifierUniforms();
+        this.assignModifierDefines();
 
         // Update uniforms with references to the added emitter's particle index range and
         // activation window position.
@@ -88,12 +167,14 @@ export class EmitterStore {
             const distribution = emitter.positionInitial.distribution;
             this.uniformsPosition.uDistributionMin.value.push( distribution ? distribution.min : new Vector3() );
             this.uniformsPosition.uDistributionMax.value.push( distribution ? distribution.max : new Vector3() );
+            this.uniformsPosition.uDistributionType.value.push( distribution ? distribution.type : 0 );
         }
-
+        
         if( this.hasVelocityDistribution ) {
             const distribution = emitter.velocityInitial.distribution;
             this.uniformsVelocity.uDistributionMin.value.push( distribution ? distribution.min : new Vector3() );
             this.uniformsVelocity.uDistributionMax.value.push( distribution ? distribution.max : new Vector3() );
+            this.uniformsVelocity.uDistributionType.value.push( distribution ? distribution.type : 0 );
         }
     }
 
@@ -136,7 +217,7 @@ export class EmitterStore {
             }
 
             // Update emitter
-            emitter.update( deltaTime, this.particleCount );
+            emitter.update( deltaTime, runTime, this.particleCount );
 
             // Update uniforms
             this.uniformsSpawn.uEmitterActive.value[ i ] = emitter.active;            

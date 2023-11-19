@@ -22,9 +22,12 @@ import {
     PointLight,
     SphereGeometry,
     Vector3,
+    Vector4,
 } from 'three';
 import { SphereDistribution } from './distributions/SphereDistribution';
 import { LineDistribution } from './distributions/LineDistribution';
+import { AccelerationModifier } from './modifiers/AccelerationModifier';
+import { SimplexNoiseModifier } from './modifiers/SimplexNoise';
 
 document.body.appendChild( renderer.domElement );
 document.body.appendChild( stats.dom );
@@ -34,9 +37,19 @@ const compute = new ParticleEngineCompute( renderer );
 // First emitter...
 const emitter0 = new Emitter( 3, 1, 2 );
 emitter0.positionInitial.origin.set( 50, 0, 0 );
+emitter0.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -10, 0 ) ) );
 compute.addEmitter( emitter0 );
 
-const emitter1 = new Emitter( 1, 1, 2 );
+const emitter1 = new Emitter( 100, 1, 20 );
+emitter1.addVelocityModifier( new SimplexNoiseModifier(
+    new Vector4(
+        124, // uNoiseTime
+        0.007, // uNoisePositionScale // 0.001
+        50.0, // uNoiseVelocityScale 
+        0.0, // uNoiseTurbulance
+    ),
+    new Vector3( 1, 1, 1 ),
+) );
 compute.addEmitter( emitter1 );
 
 

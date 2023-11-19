@@ -1,4 +1,4 @@
-import { DataTexture, HalfFloatType, IUniform, Mesh, MeshBasicMaterial, PlaneGeometry, Scene, Texture, Vector2, Vector3, WebGLRenderer } from "three";
+import { DataTexture, HalfFloatType, IUniform, Material, Mesh, MeshBasicMaterial, PlaneGeometry, Scene, Texture, Vector2, Vector3, WebGLRenderer } from "three";
 import { Emitter } from "./Emitter";
 import { GPUComputationRenderer, Variable } from "three/examples/jsm/Addons.js";
 import { TextureUniformName, TextureName } from "./constants/textures";
@@ -68,6 +68,7 @@ export class ParticleEngineCompute {
         this.createDataTextureVariables();
         this.setVariableDependencies();
         this.setDataTextureUniforms();
+        this.setDataTextureDefines();
         this.gpuCompute.init();
     }
 
@@ -182,6 +183,21 @@ export class ParticleEngineCompute {
         console.log( 'spawn uniforms:', spawnUniforms );
         console.log( 'velocity uniforms:', velocityUniforms );
         console.log( 'position uniforms:', positionUniforms );
+    }
+
+    private setDataTextureDefines(): void {
+        const spawnMaterial = this.dataTextureVariables[ TextureName.SPAWN ]?.material as Material;
+        const velocityMaterial = this.dataTextureVariables[ TextureName.VELOCITY ]?.material as Material;
+        const positionMaterial = this.dataTextureVariables[ TextureName.POSITION ]?.material as Material;
+
+        spawnMaterial.defines = spawnMaterial.defines || {};
+        velocityMaterial.defines = velocityMaterial.defines || {};
+        positionMaterial.defines = positionMaterial.defines || {};
+
+        velocityMaterial.defines = {
+            ...velocityMaterial.defines,
+            ...this.emitterStore.defines[ TextureName.VELOCITY ],
+        };
     }
 
     get particleCount(): number {

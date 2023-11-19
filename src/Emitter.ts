@@ -36,8 +36,8 @@ export class Emitter {
     positionInitial: EmitterInitial<Vector3> = {
         origin: new Vector3( 0, 0, 0 ),
         distribution: new BoxDistribution(
-            new Vector3( 5, 5, 5 ),
-            new Vector3( 10, 10, 10 ),
+            new Vector3( 0, 0, 0 ),
+            new Vector3( 0, 0, 0 ),
         ),
     };
     velocityInitial: EmitterInitial<Vector3> = {
@@ -86,6 +86,7 @@ export class Emitter {
         this.spawnRate = spawnRate;
         this.burstRate = burstRate;
         this.maxAge = maxAge;
+        console.log( 'emitter:', this );
     }
 
     get spawnRate() {
@@ -174,7 +175,7 @@ export class Emitter {
         this.particleCountChanged = false;
     }
 
-    update( deltaTime: number, totalParticleCount: number ) {
-        // this.updateActivationWindow( deltaTime, totalParticleCount );
+    update( deltaTime: number, runTime: number, totalParticleCount: number ) {
+        this.velocityModifiers.update( deltaTime, runTime );
     }
 }

@@ -35,7 +35,7 @@ uniform int[EMITTER_COUNT] uModBitMask;
 #endif
 
 #ifdef MOD_DRAG
-    uniform vec3[EMITTER_COUNT] uModDrag;
+    uniform float[EMITTER_COUNT] uModDrag;
 #endif
 
 /*
@@ -421,13 +421,16 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
                 velocity += uModAcceleration[ i ] * deltaTime;
             #endif
 
+            // TODO: Would it be more efficient to add a branch to check against the
+            // uModBitMask uniform here? I'm assuming so since a branch _should_ be
+            // less expensive than computing simplex noise...
             #ifdef MOD_SIMPLEX_NOISE
-                // if( uModBitMask )
+                // if( hasBitFlag( uModBitMask, 1 << 3 ) ) ...
                 velocity += calculateNoiseVelocity( position, uModNoiseParams[ i ], uModNoiseScale[ i ] ) * deltaTime;
             #endif
 
             #ifdef MOD_DRAG
-                velocity *= uModDrag[ i ];
+                velocity *= 1.0 - uModDrag[ i ];
             #endif
         }
         else {

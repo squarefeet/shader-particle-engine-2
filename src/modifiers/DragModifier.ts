@@ -7,5 +7,7 @@ export class DragModifier extends Modifier<number> {
         MOD_DRAG: true
     };
 
-    uniformName: string = 'uModDrag';
+    constructor( value: number ) {
+        super( value, 'uModDrag' );
+    }
 }

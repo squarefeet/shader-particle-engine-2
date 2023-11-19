@@ -28,12 +28,12 @@ const renderer = new WebGLRenderer( {
 } );
 const stats = new Stats();
 const controls = new OrbitControls( camera, renderer.domElement );
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
 
 // Setup those bits n bobs
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
 camera.position.y = 0;
-camera.position.z = 51;
+camera.position.z = 1000;
 camera.lookAt( new Vector3( 0, 0, 0 ) );
 stats.showPanel( 0 );
 

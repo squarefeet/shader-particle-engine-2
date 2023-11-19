@@ -32,6 +32,6 @@ export class SimplexNoiseModifier extends Modifier<Vector4 | Vector3> {
     }
 
     update( deltaTime: number, runTime: number ) {
-        this.params.x = runTime * 2;
+        this.params.x = runTime * 0.1;
     }
 }

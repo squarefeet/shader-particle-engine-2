@@ -296,7 +296,7 @@ vec3 randomSphereDistribution( float seed, vec3 minSize, vec3 maxSize, vec3 init
     rng_state = uint( seed );
     vec3 random = vec3(PCGHash(), PCGHash(), PCGHash()) / float(0xFFFFFFFFU) * 2.0 - 1.0;
 
-    vec3 direction = normalize( position - random ) * maxSize.x;
+    vec3 direction = normalize( vec3(0.0) - random ) * maxSize.x;
 
     return direction;
 
@@ -359,6 +359,7 @@ vec3 getInitialValue(
     // SPHERE
     else if( distType == 3 ) {
         return initialValue + randomSphereDistribution( seed, minSize, maxSize, initialValue, position );
+        // return initialValue + randomBoxDistribution( seed, minSize, maxSize );
     }
 
     // LINE

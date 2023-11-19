@@ -1,4 +1,4 @@
-import { Vector2 } from "three";
+import { Vector2, Vector4 } from "three";
 
 let PARTICLE_COUNT = 0;
 
@@ -8,72 +8,74 @@ export function resetParticleCount() {
 }
 
 export class ActivationWindow {
-    _spawnRate: number;
-    _burstRate: number;
-    _maxAge: number;
     indexStart: number;
     indexEnd: number;
+    indexRange: Vector2;
     numParticles: number;
     time: number;
     value: Vector2;
+    spawnValue: Vector4 = new Vector4();
 
     constructor( spawnRate: number, burstRate: number, maxAge: number ) {
-        this._spawnRate = Math.max( 0.01, spawnRate );
-        this._burstRate = Math.max( 1, burstRate );
-        this._maxAge = Math.max( 0.01, maxAge );
+        this.time = 0;
+        this.spawnValue.x = Math.max( 0.01, spawnRate );
+        this.spawnValue.y = Math.max( 1, burstRate );
+        this.spawnValue.z = Math.max( 0.01, maxAge );
+        this.spawnValue.w = 0;
 
         this.numParticles = Math.max(
             4,
-            Math.ceil(this._spawnRate) * Math.ceil(this._burstRate) * Math.ceil(this._maxAge)
+            Math.ceil( this.spawnRate ) * Math.ceil( this.burstRate ) * Math.ceil( this.maxAge )
         );
 
-        this.indexStart = PARTICLE_COUNT;
-        this.indexEnd = Math.max( PARTICLE_COUNT, this.indexStart + this.numParticles - 1 );
-        this.time = 0;
-
+        const indexStart = PARTICLE_COUNT;
+        const indexEnd = Math.max( PARTICLE_COUNT, indexStart + this.numParticles - 1 );
+        
+        this.indexRange = new Vector2( indexStart, indexEnd );
         this.value = new Vector2();
 
         PARTICLE_COUNT += this.numParticles;
     }
 
     get spawnRate(): number {
-        return this._spawnRate;
+        return this.spawnValue.x;
     }
     set spawnRate( rate: number ) {
-        this._spawnRate = rate;
+        this.spawnValue.x = rate;
     }
 
     get burstRate(): number {
-        return this._burstRate;
+        return this.spawnValue.y;
     }
     set burstRate( rate: number ) {
-        this._burstRate = rate;
+        this.spawnValue.y = rate;
     }
 
     get maxAge(): number {
-        return this._maxAge;
+        return this.spawnValue.z;
     }
     set maxAge( value: number ) {
-        this._maxAge = value;
+        this.spawnValue.z = value;
     }
 
+    // deprecated
     get textureSize() {
         return Math.max(
             2,
-            Math.ceil( Math.sqrt( this._spawnRate * this._burstRate * this._maxAge ) )
+            Math.ceil( Math.sqrt( this.spawnRate * this.burstRate * this.maxAge ) )
         );
     }
 
     update( deltaTime: number, numParticles: number ) {
         this.time += deltaTime;
 
-        let start = Math.floor( this._spawnRate * this.time ) * this._burstRate;
+        let start = Math.floor( this.spawnRate * this.time ) * this.burstRate;
         start = start % this.numParticles;
 
-        const particlesPerTick = Math.floor( this._spawnRate * deltaTime );
+        const particlesPerTick = Math.floor( this.spawnRate * deltaTime );
         // const particlesPerTick = 0;
 
-        let end = start + this._burstRate + particlesPerTick;
+        let end = start + this.burstRate + particlesPerTick;
         end = end % this.numParticles;
 
         this.value.x = ( this.indexStart + start ) % numParticles;

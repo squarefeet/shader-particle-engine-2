@@ -49,7 +49,7 @@ void main() {
     float normalisedAge = age / maxAge;
     float invertedNormalisedAge = 1.0 - normalisedAge;
 
-    transformed = transformed * invertedNormalisedAge;
+    // transformed = transformed * invertedNormalisedAge;
     transformed = vec3( transformed + particlePosition );
 
 	#include <morphtarget_vertex>

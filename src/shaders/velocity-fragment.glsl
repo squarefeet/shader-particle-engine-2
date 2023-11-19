@@ -20,13 +20,23 @@ uniform vec2 uTime;
         vec2( 10, 19 )
     ]
 */
-uniform vec2[EMITTER_COUNT] uEmitterIndexRanges;
+uniform vec2[EMITTER_COUNT] uEmitterIndexRange;
 
 // The following uniforms follow the same pattern...
 uniform vec3[EMITTER_COUNT] uInitialValue; // vec4( base.xyz, float distributionType )
 uniform vec3[EMITTER_COUNT] uDistributionMin;
 uniform vec3[EMITTER_COUNT] uDistributionMax;
 uniform int[EMITTER_COUNT] uDistributionType;
+
+uniform int[EMITTER_COUNT] uModBitMask;
+
+#ifdef MOD_ACCELERATION
+    uniform vec3[EMITTER_COUNT] uModAcceleration;
+#endif
+
+#ifdef MOD_DRAG
+    uniform float[EMITTER_COUNT] uModDrag;
+#endif
 
 /*
     Another array, this contains the values for
@@ -57,177 +67,183 @@ uniform int[EMITTER_COUNT] uDistributionType;
  */
 // uniform mat4[EMITTER_COUNT] uAttractors;
 
-uniform vec4[EMITTER_COUNT] uNoiseParams;
-uniform vec3[EMITTER_COUNT] uNoiseScale;
+#ifdef MOD_SIMPLEX_NOISE
+    uniform vec4[EMITTER_COUNT] uModNoiseParams;
+    uniform vec3[EMITTER_COUNT] uModNoiseScale;
+    // uniform vec3[EMITTER_COUNT] uNoiseScale;
+#endif
 
 
+#ifdef MOD_SIMPLEX_NOISE
+    #define F4 0.309016994374947451
+    #define OCTAVES 2
 
-vec4 mod289(vec4 x) {
-    return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-float mod289(float x) {
-    return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec4 permute(vec4 x) {
-    return mod289(((x*34.0)+1.0)*x);
-}
-
-float permute(float x) {
-    return mod289(((x*34.0)+1.0)*x);
-}
-
-vec4 taylorInvSqrt(vec4 r) {
-    return 1.79284291400159 - 0.85373472095314 * r;
-}
-
-float taylorInvSqrt(float r) {
-    return 1.79284291400159 - 0.85373472095314 * r;
-}
-
-vec4 grad4(float j, vec4 ip) {
-    const vec4 ones = vec4(1.0, 1.0, 1.0, -1.0);
-    vec4 p,s;
-
-    p.xyz = floor( fract (vec3(j) * ip.xyz) * 7.0) * ip.z - 1.0;
-    p.w = 1.5 - dot(abs(p.xyz), ones.xyz);
-    s = vec4(lessThan(p, vec4(0.0)));
-    p.xyz = p.xyz + (s.xyz*2.0 - 1.0) * s.www;
-
-    return p;
-}
-
-#define F4 0.309016994374947451
-
-vec4 simplexNoiseDerivatives (vec4 v) {
-    const vec4  C = vec4( 0.138196601125011,0.276393202250021,0.414589803375032,-0.447213595499958);
-
-    vec4 i  = floor(v + dot(v, vec4(F4)) );
-    vec4 x0 = v -   i + dot(i, C.xxxx);
-
-    vec4 i0;
-    vec3 isX = step( x0.yzw, x0.xxx );
-    vec3 isYZ = step( x0.zww, x0.yyz );
-    i0.x = isX.x + isX.y + isX.z;
-    i0.yzw = 1.0 - isX;
-    i0.y += isYZ.x + isYZ.y;
-    i0.zw += 1.0 - isYZ.xy;
-    i0.z += isYZ.z;
-    i0.w += 1.0 - isYZ.z;
-
-    vec4 i3 = clamp( i0, 0.0, 1.0 );
-    vec4 i2 = clamp( i0-1.0, 0.0, 1.0 );
-    vec4 i1 = clamp( i0-2.0, 0.0, 1.0 );
-
-    vec4 x1 = x0 - i1 + C.xxxx;
-    vec4 x2 = x0 - i2 + C.yyyy;
-    vec4 x3 = x0 - i3 + C.zzzz;
-    vec4 x4 = x0 + C.wwww;
-
-    i = mod289(i);
-    float j0 = permute( permute( permute( permute(i.w) + i.z) + i.y) + i.x);
-    vec4 j1 = permute( permute( permute( permute (
-                i.w + vec4(i1.w, i2.w, i3.w, 1.0 ))
-            + i.z + vec4(i1.z, i2.z, i3.z, 1.0 ))
-            + i.y + vec4(i1.y, i2.y, i3.y, 1.0 ))
-            + i.x + vec4(i1.x, i2.x, i3.x, 1.0 ));
-
-
-    vec4 ip = vec4(1.0/294.0, 1.0/49.0, 1.0/7.0, 0.0) ;
-
-    vec4 p0 = grad4(j0,   ip);
-    vec4 p1 = grad4(j1.x, ip);
-    vec4 p2 = grad4(j1.y, ip);
-    vec4 p3 = grad4(j1.z, ip);
-    vec4 p4 = grad4(j1.w, ip);
-
-    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
-    p0 *= norm.x;
-    p1 *= norm.y;
-    p2 *= norm.z;
-    p3 *= norm.w;
-    p4 *= taylorInvSqrt(dot(p4,p4));
-
-    vec3 values0 = vec3(dot(p0, x0), dot(p1, x1), dot(p2, x2)); //value of contributions from each corner at point
-    vec2 values1 = vec2(dot(p3, x3), dot(p4, x4));
-
-    vec3 m0 = max(0.5 - vec3(dot(x0,x0), dot(x1,x1), dot(x2,x2)), 0.0); //(0.5 - x^2) where x is the distance
-    vec2 m1 = max(0.5 - vec2(dot(x3,x3), dot(x4,x4)), 0.0);
-
-    vec3 temp0 = -6.0 * m0 * m0 * values0;
-    vec2 temp1 = -6.0 * m1 * m1 * values1;
-
-    vec3 mmm0 = m0 * m0 * m0;
-    vec2 mmm1 = m1 * m1 * m1;
-
-    float dx = temp0[0] * x0.x + temp0[1] * x1.x + temp0[2] * x2.x + temp1[0] * x3.x + temp1[1] * x4.x + mmm0[0] * p0.x + mmm0[1] * p1.x + mmm0[2] * p2.x + mmm1[0] * p3.x + mmm1[1] * p4.x;
-    float dy = temp0[0] * x0.y + temp0[1] * x1.y + temp0[2] * x2.y + temp1[0] * x3.y + temp1[1] * x4.y + mmm0[0] * p0.y + mmm0[1] * p1.y + mmm0[2] * p2.y + mmm1[0] * p3.y + mmm1[1] * p4.y;
-    float dz = temp0[0] * x0.z + temp0[1] * x1.z + temp0[2] * x2.z + temp1[0] * x3.z + temp1[1] * x4.z + mmm0[0] * p0.z + mmm0[1] * p1.z + mmm0[2] * p2.z + mmm1[0] * p3.z + mmm1[1] * p4.z;
-    float dw = temp0[0] * x0.w + temp0[1] * x1.w + temp0[2] * x2.w + temp1[0] * x3.w + temp1[1] * x4.w + mmm0[0] * p0.w + mmm0[1] * p1.w + mmm0[2] * p2.w + mmm1[0] * p3.w + mmm1[1] * p4.w;
-
-    return vec4(dx, dy, dz, dw) * 49.0;
-}
-
-#define OCTAVES 2
-
-
-vec3 calculateNoiseVelocity( vec3 currentPosition, vec4 uNoiseParamsValue, vec3 uNoiseScaleValue ) {
-    float uNoiseTime = uNoiseParamsValue.x;
-    float uNoisePositionScale = uNoiseParamsValue.y;
-    vec3 uNoiseVelocityScale = uNoiseScaleValue; // uNoiseParamsValue.z
-    float uNoiseTurbulance = uNoiseParamsValue.w;
-
-    vec3 noisePosition = currentPosition * uNoisePositionScale;
-    float noiseTime = uNoiseTime;
-
-    vec4 xNoisePotentialDerivatives = vec4(0.0);
-    vec4 yNoisePotentialDerivatives = vec4(0.0);
-    vec4 zNoisePotentialDerivatives = vec4(0.0);
-
-    vec3 yDerivativeAdjustment = normalize( vec3(123.4, 129845.6, -1239.1) );
-    // vec3 yDerivativeAdjustment = vec3(0.0, 1.0, 0.0);
-    vec3 zDerivativeAdjustment = normalize( vec3(-9519.0, 9051.0, -123.0) );
-    // vec3 zDerivativeAdjustment = vec3(0.0, 0.0, 1.0 );
-
-    for (int i = 0; i < OCTAVES; ++i) {
-        float octaveValue = pow( 2.0, float( i ) );
-        float scale = (1.0 / 2.0) * octaveValue;
-
-        float noiseScale = pow(uNoiseTurbulance, float(i));
-
-        // fix undefined behaviour
-        if( uNoiseTurbulance == 0.0 && i == 0 ) {
-            noiseScale = 1.0;
-        }
-
-        float scaleMultiplier = noiseScale * scale;
-
-        xNoisePotentialDerivatives += simplexNoiseDerivatives(
-            vec4(noisePosition * octaveValue, noiseTime)
-        ) * scaleMultiplier;
-
-        yNoisePotentialDerivatives += simplexNoiseDerivatives(
-            vec4((noisePosition + yDerivativeAdjustment) * octaveValue, noiseTime)
-        ) * scaleMultiplier;
-
-        zNoisePotentialDerivatives += simplexNoiseDerivatives(
-            vec4((noisePosition + zDerivativeAdjustment) * octaveValue, noiseTime)
-        ) * scaleMultiplier;
+    vec4 mod289(vec4 x) {
+        return x - floor(x * (1.0 / 289.0)) * 289.0;
     }
 
-    //compute curl
-    vec3 noiseVelocity = vec3(
-        zNoisePotentialDerivatives[1] - yNoisePotentialDerivatives[2],
-        xNoisePotentialDerivatives[2] - zNoisePotentialDerivatives[0],
-        yNoisePotentialDerivatives[0] - xNoisePotentialDerivatives[1]
-    );
+    float mod289(float x) {
+        return x - floor(x * (1.0 / 289.0)) * 289.0;
+    }
 
-    return normalize( noiseVelocity ) * uNoiseVelocityScale;
-}
+    vec4 permute(vec4 x) {
+        return mod289(((x*34.0)+1.0)*x);
+    }
+
+    float permute(float x) {
+        return mod289(((x*34.0)+1.0)*x);
+    }
+
+    vec4 taylorInvSqrt(vec4 r) {
+        return 1.79284291400159 - 0.85373472095314 * r;
+    }
+
+    float taylorInvSqrt(float r) {
+        return 1.79284291400159 - 0.85373472095314 * r;
+    }
+
+    vec4 grad4(float j, vec4 ip) {
+        const vec4 ones = vec4(1.0, 1.0, 1.0, -1.0);
+        vec4 p,s;
+
+        p.xyz = floor( fract (vec3(j) * ip.xyz) * 7.0) * ip.z - 1.0;
+        p.w = 1.5 - dot(abs(p.xyz), ones.xyz);
+        s = vec4(lessThan(p, vec4(0.0)));
+        p.xyz = p.xyz + (s.xyz*2.0 - 1.0) * s.www;
+
+        return p;
+    }
+
+    vec4 simplexNoiseDerivatives (vec4 v) {
+        const vec4  C = vec4( 0.138196601125011,0.276393202250021,0.414589803375032,-0.447213595499958);
+
+        vec4 i  = floor(v + dot(v, vec4(F4)) );
+        vec4 x0 = v -   i + dot(i, C.xxxx);
+
+        vec4 i0;
+        vec3 isX = step( x0.yzw, x0.xxx );
+        vec3 isYZ = step( x0.zww, x0.yyz );
+        i0.x = isX.x + isX.y + isX.z;
+        i0.yzw = 1.0 - isX;
+        i0.y += isYZ.x + isYZ.y;
+        i0.zw += 1.0 - isYZ.xy;
+        i0.z += isYZ.z;
+        i0.w += 1.0 - isYZ.z;
+
+        vec4 i3 = clamp( i0, 0.0, 1.0 );
+        vec4 i2 = clamp( i0-1.0, 0.0, 1.0 );
+        vec4 i1 = clamp( i0-2.0, 0.0, 1.0 );
+
+        vec4 x1 = x0 - i1 + C.xxxx;
+        vec4 x2 = x0 - i2 + C.yyyy;
+        vec4 x3 = x0 - i3 + C.zzzz;
+        vec4 x4 = x0 + C.wwww;
+
+        i = mod289(i);
+        float j0 = permute( permute( permute( permute(i.w) + i.z) + i.y) + i.x);
+        vec4 j1 = permute( permute( permute( permute (
+                    i.w + vec4(i1.w, i2.w, i3.w, 1.0 ))
+                + i.z + vec4(i1.z, i2.z, i3.z, 1.0 ))
+                + i.y + vec4(i1.y, i2.y, i3.y, 1.0 ))
+                + i.x + vec4(i1.x, i2.x, i3.x, 1.0 ));
 
 
+        vec4 ip = vec4(1.0/294.0, 1.0/49.0, 1.0/7.0, 0.0) ;
 
+        vec4 p0 = grad4(j0,   ip);
+        vec4 p1 = grad4(j1.x, ip);
+        vec4 p2 = grad4(j1.y, ip);
+        vec4 p3 = grad4(j1.z, ip);
+        vec4 p4 = grad4(j1.w, ip);
+
+        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+        p0 *= norm.x;
+        p1 *= norm.y;
+        p2 *= norm.z;
+        p3 *= norm.w;
+        p4 *= taylorInvSqrt(dot(p4,p4));
+
+        vec3 values0 = vec3(dot(p0, x0), dot(p1, x1), dot(p2, x2)); //value of contributions from each corner at point
+        vec2 values1 = vec2(dot(p3, x3), dot(p4, x4));
+
+        vec3 m0 = max(0.5 - vec3(dot(x0,x0), dot(x1,x1), dot(x2,x2)), 0.0); //(0.5 - x^2) where x is the distance
+        vec2 m1 = max(0.5 - vec2(dot(x3,x3), dot(x4,x4)), 0.0);
+
+        vec3 temp0 = -6.0 * m0 * m0 * values0;
+        vec2 temp1 = -6.0 * m1 * m1 * values1;
+
+        vec3 mmm0 = m0 * m0 * m0;
+        vec2 mmm1 = m1 * m1 * m1;
+
+        float dx = temp0[0] * x0.x + temp0[1] * x1.x + temp0[2] * x2.x + temp1[0] * x3.x + temp1[1] * x4.x + mmm0[0] * p0.x + mmm0[1] * p1.x + mmm0[2] * p2.x + mmm1[0] * p3.x + mmm1[1] * p4.x;
+        float dy = temp0[0] * x0.y + temp0[1] * x1.y + temp0[2] * x2.y + temp1[0] * x3.y + temp1[1] * x4.y + mmm0[0] * p0.y + mmm0[1] * p1.y + mmm0[2] * p2.y + mmm1[0] * p3.y + mmm1[1] * p4.y;
+        float dz = temp0[0] * x0.z + temp0[1] * x1.z + temp0[2] * x2.z + temp1[0] * x3.z + temp1[1] * x4.z + mmm0[0] * p0.z + mmm0[1] * p1.z + mmm0[2] * p2.z + mmm1[0] * p3.z + mmm1[1] * p4.z;
+        float dw = temp0[0] * x0.w + temp0[1] * x1.w + temp0[2] * x2.w + temp1[0] * x3.w + temp1[1] * x4.w + mmm0[0] * p0.w + mmm0[1] * p1.w + mmm0[2] * p2.w + mmm1[0] * p3.w + mmm1[1] * p4.w;
+
+        return vec4(dx, dy, dz, dw) * 49.0;
+    }
+
+    vec3 calculateNoiseVelocity( vec3 currentPosition, vec4 uModNoiseParamsValue, vec3 uModNoiseScaleValue ) {
+        if( length( uModNoiseParamsValue ) == 0.0 ) {
+            return vec3( 0.0 );
+        }
+
+        float uNoiseTime = uModNoiseParamsValue.x;
+        float uNoisePositionScale = uModNoiseParamsValue.y;
+        // vec3 uNoiseVelocityScale = uNoiseScaleValue;
+        float uNoiseVelocityScale = uModNoiseParamsValue.z;
+        float uNoiseTurbulance = uModNoiseParamsValue.w;
+
+        vec3 noisePosition = currentPosition * uNoisePositionScale;
+        float noiseTime = uNoiseTime;
+
+        vec4 xNoisePotentialDerivatives = vec4(0.0);
+        vec4 yNoisePotentialDerivatives = vec4(0.0);
+        vec4 zNoisePotentialDerivatives = vec4(0.0);
+
+        vec3 yDerivativeAdjustment = normalize( vec3(123.4, 129845.6, -1239.1) );
+        // vec3 yDerivativeAdjustment = vec3(0.0, 1.0, 0.0);
+        vec3 zDerivativeAdjustment = normalize( vec3(-9519.0, 9051.0, -123.0) );
+        // vec3 zDerivativeAdjustment = vec3(0.0, 0.0, 1.0 );
+
+        for (int i = 0; i < OCTAVES; ++i) {
+            float octaveValue = pow( 2.0, float( i ) );
+            // float octaveValue = float( 1 << i );
+            float scale = (1.0 / 2.0) * octaveValue;
+
+            float noiseScale = pow(uNoiseTurbulance, float(i));
+
+            // fix undefined behaviour
+            if( uNoiseTurbulance == 0.0 && i == 0 ) {
+                noiseScale = 1.0;
+            }
+
+            float scaleMultiplier = noiseScale * scale;
+
+            xNoisePotentialDerivatives += simplexNoiseDerivatives(
+                vec4(noisePosition * octaveValue, noiseTime)
+            ) * scaleMultiplier;
+
+            yNoisePotentialDerivatives += simplexNoiseDerivatives(
+                vec4((noisePosition + yDerivativeAdjustment) * octaveValue, noiseTime)
+            ) * scaleMultiplier;
+
+            zNoisePotentialDerivatives += simplexNoiseDerivatives(
+                vec4((noisePosition + zDerivativeAdjustment) * octaveValue, noiseTime)
+            ) * scaleMultiplier;
+        }
+
+        //compute curl
+        vec3 noiseVelocity = vec3(
+            zNoisePotentialDerivatives[1] - yNoisePotentialDerivatives[2],
+            xNoisePotentialDerivatives[2] - zNoisePotentialDerivatives[0],
+            yNoisePotentialDerivatives[0] - xNoisePotentialDerivatives[1]
+        );
+
+        // return normalize( noiseVelocity ) * uNoiseVelocityScale;
+        return noiseVelocity * uNoiseVelocityScale * uModNoiseScaleValue;
+    }
+#endif
 
 
 
@@ -378,14 +394,13 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
     // Loop through all emitters...
     for( int i = 0; i < EMITTER_COUNT; ++i ) {
-        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRanges[ i ], particleIndex );
+        bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRange[ i ], particleIndex );
 
         // If the current particleIndex does not fall within this emitter range,
         // continue on with the loop.
         if( isWithinEmitterRange == false ) {
             continue;
         }
-
 
         // Particle has just been born, so set its initial value
         if( particleIsNew( alive, age ) ) {
@@ -402,23 +417,21 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
         // Particle is alive, so apply the relevant forces
         else if( particleIsLiving( alive, age ) ) {
-            // velocity += uAcceleration[ i ] * deltaTime;
-            // velocity *= ( 1.0 - uDrag[ i ] );
-            // velocity *= 0.97;
+            #ifdef MOD_ACCELERATION
+                velocity += uModAcceleration[ i ] * deltaTime;
+            #endif
 
-            velocity += calculateNoiseVelocity( position, uNoiseParams[ i ], uNoiseScale[ i ] ) * deltaTime;
-            velocity.y -= 1.0;
-            // velocity = min( vec3( 10.0 ), velocity );
+            // TODO: Would it be more efficient to add a branch to check against the
+            // uModBitMask uniform here? I'm assuming so since a branch _should_ be
+            // less expensive than computing simplex noise...
+            #ifdef MOD_SIMPLEX_NOISE
+                // if( hasBitFlag( uModBitMask, 1 << 3 ) ) ...
+                velocity += calculateNoiseVelocity( position, uModNoiseParams[ i ], uModNoiseScale[ i ] ) * deltaTime;
+            #endif
 
-            // velocity += vec3( 0.0, 0.0, 20.0 ) * deltaTime;
-            // velocity = calculateNoiseVelocity( position );
-
-            // if( position.x + velocity.x > 1000.0 ) {
-            //     velocity.x *= -1.0;
-            // }
-            // else if( position.x + velocity.x < -1000.0 ) {
-            //     velocity.x *= -1.0;
-            // }
+            #ifdef MOD_DRAG
+                velocity *= 1.0 - uModDrag[ i ];
+            #endif
         }
         else {
             velocity = vec3( 0.0 );

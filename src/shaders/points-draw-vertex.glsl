@@ -48,7 +48,7 @@ void main() {
 
     vec4 mvPosition = modelViewMatrix * vec4( pos, 1.0 );
 
-    float size = 10.0 * ( 1.0 - normalisedAge );
+    float size = 3.0 * ( 1.0 - normalisedAge );
     // float size = 30.0 + (500.0 * normalisedAge);
 
     gl_PointSize = size * ( 300.0 / -mvPosition.z );

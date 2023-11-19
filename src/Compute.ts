@@ -1,4 +1,4 @@
-import { DataTexture, HalfFloatType, IUniform, Mesh, MeshBasicMaterial, PlaneGeometry, Scene, Texture, Vector2, Vector3, WebGLRenderer } from "three";
+import { DataTexture, HalfFloatType, IUniform, Material, Mesh, MeshBasicMaterial, PlaneGeometry, Scene, Texture, Vector2, Vector3, WebGLRenderer } from "three";
 import { Emitter } from "./Emitter";
 import { GPUComputationRenderer, Variable } from "three/examples/jsm/Addons.js";
 import { TextureUniformName, TextureName } from "./constants/textures";
@@ -6,11 +6,12 @@ import spawnFragmentShader from './shaders/spawn-fragment.glsl?raw';
 import velocityFragmentShader from './shaders/velocity-fragment.glsl?raw';
 import positionFragmentShader from './shaders/position-fragment.glsl?raw';
 import { Distribution } from "./distributions/Distribution";
+import { EmitterStore } from './EmitterStore';
 
 export type ComputeDebugPlaneMesh = Mesh<PlaneGeometry, MeshBasicMaterial>;
 
 export class ParticleEngineCompute {
-    emitters: Emitter[] = [];
+    emitterStore: EmitterStore = new EmitterStore();
     textureSize: number = 1;
     force2PowerTextureSize: boolean = false;
     webGLRenderer: WebGLRenderer;
@@ -36,9 +37,8 @@ export class ParticleEngineCompute {
     // Uniforms common to all compute shaders
     commonUniforms = {
         // uTime consists of vec2( deltaTime, runTime )
-        uTime: new Vector2(),
-        uEmitterIndexRanges: [ new Vector2() ],
-        uActivationWindow: [ new Vector2() ],
+        uTime: { value: new Vector2() },
+        uEmitterIndexRange: this.emitterStore.uniformsSpawn.uEmitterIndexRange,
     };
 
     debugPlanes: Record<TextureName, ComputeDebugPlaneMesh | null> = {
@@ -68,6 +68,7 @@ export class ParticleEngineCompute {
         this.createDataTextureVariables();
         this.setVariableDependencies();
         this.setDataTextureUniforms();
+        this.setDataTextureDefines();
         this.gpuCompute.init();
     }
 
@@ -83,9 +84,9 @@ export class ParticleEngineCompute {
         for( let i = 0; i < tPosition.length; i += 4 ) {
             const particleIndex = i / 4;
 
-            const applicableEmitter = this.emitters.find( emitter => {
-                const start = emitter.activationWindow.indexStart;
-                const end = emitter.activationWindow.indexEnd;
+            const applicableEmitter = this.emitterStore.store.find( emitter => {
+                const start = emitter.uniforms.uEmitterIndexRange.value.x;
+                const end = emitter.uniforms.uEmitterIndexRange.value.y;
 
                 return particleIndex >= start && particleIndex <= end;
             } );
@@ -101,7 +102,7 @@ export class ParticleEngineCompute {
             tVelocity[ i + 3 ] = 0;
 
             tSpawn[ i + 0 ] = 0;
-            tSpawn[ i + 1 ] = applicableEmitter ? applicableEmitter.activationWindow.maxAge : 1;
+            tSpawn[ i + 1 ] = applicableEmitter ? applicableEmitter.maxAge : 1;
             tSpawn[ i + 2 ] = 0;
             tSpawn[ i + 3 ] = particleIndex;
         }
@@ -149,9 +150,24 @@ export class ParticleEngineCompute {
     }
 
     private setDataTextureUniforms(): void {
-        const positionUniforms = this.dataTextureVariables[ TextureName.POSITION ]?.material.uniforms as { [uniform: string]: IUniform };
-        const velocityUniforms = this.dataTextureVariables[ TextureName.VELOCITY ]?.material.uniforms as { [uniform: string]: IUniform };
         const spawnUniforms = this.dataTextureVariables[ TextureName.SPAWN ]?.material.uniforms as { [uniform: string]: IUniform };
+        const velocityUniforms = this.dataTextureVariables[ TextureName.VELOCITY ]?.material.uniforms as { [uniform: string]: IUniform };
+        const positionUniforms = this.dataTextureVariables[ TextureName.POSITION ]?.material.uniforms as { [uniform: string]: IUniform };
+
+        Object.keys( this.emitterStore.uniformsSpawn ).forEach( key => {
+            const uniform = this.emitterStore.uniformsSpawn[ key ];
+            spawnUniforms[ key ] = uniform;
+        } );
+
+        Object.keys( this.emitterStore.uniformsVelocity ).forEach( key => {
+            const uniform = this.emitterStore.uniformsVelocity[ key ];
+            velocityUniforms[ key ] = uniform;
+        } );
+
+        Object.keys( this.emitterStore.uniformsPosition ).forEach( key => {
+            const uniform = this.emitterStore.uniformsPosition[ key ];
+            positionUniforms[ key ] = uniform;
+        } );
 
         // Assign all common uniforms.
         // The values for these common uniforms are shared across _all_
@@ -161,8 +177,27 @@ export class ParticleEngineCompute {
         Object.entries( this.commonUniforms ).forEach( ( [ uniformName, unifomValue ] ) => {
             positionUniforms[ uniformName ] = 
                 velocityUniforms[ uniformName ] =
-                    spawnUniforms[ uniformName ] = { value: unifomValue };
+                    spawnUniforms[ uniformName ] = unifomValue;
         } );
+
+        console.log( 'spawn uniforms:', spawnUniforms );
+        console.log( 'velocity uniforms:', velocityUniforms );
+        console.log( 'position uniforms:', positionUniforms );
+    }
+
+    private setDataTextureDefines(): void {
+        const spawnMaterial = this.dataTextureVariables[ TextureName.SPAWN ]?.material as Material;
+        const velocityMaterial = this.dataTextureVariables[ TextureName.VELOCITY ]?.material as Material;
+        const positionMaterial = this.dataTextureVariables[ TextureName.POSITION ]?.material as Material;
+
+        spawnMaterial.defines = spawnMaterial.defines || {};
+        velocityMaterial.defines = velocityMaterial.defines || {};
+        positionMaterial.defines = positionMaterial.defines || {};
+
+        velocityMaterial.defines = {
+            ...velocityMaterial.defines,
+            ...this.emitterStore.defines[ TextureName.VELOCITY ],
+        };
     }
 
     get particleCount(): number {
@@ -335,11 +370,7 @@ export class ParticleEngineCompute {
 
         console.log( this.dataTextureVariables[ TextureName.POSITION ]?.material.uniforms );
 
-        // Set number of emitter #define statements so each compute shader
-        // knows how many emitters it's working with.
-        ( this.gpuCompute.variables as Variable[] ).forEach( v => {
-            v.material.defines.EMITTER_COUNT = this.emitters.length;
-        } );
+        
     }
 
     // OPTIMISE
@@ -347,41 +378,24 @@ export class ParticleEngineCompute {
     // At the moment, each emitter added causes a complete
     // recalculation of all data textures :\
     addEmitter( emitter: Emitter ): void {
-        this.emitters.push( emitter );
-
-        // Calculate the total number of particles that we absolutely need.
-        const totalRequiredParticles = this.emitters.reduce( ( out, e ) => {
-            return out + e.activationWindow.numParticles;
-        }, 0 );
-        
-        // For ease, ensure we're working with at least a 2x2 texture, or if
-        // greater than that size, round it up to the nearest square whole number.
-        // This will likely create a texture size larger than we need, so this 
-        // could be optimised in the future.
-        const textureSize = Math.max( 2, Math.ceil( Math.sqrt( totalRequiredParticles ) ) );
-
-        // Re-assign common uniforms
-        this.commonUniforms.uEmitterIndexRanges = this.emitters.map( emitter => {
-            return new Vector2(
-                emitter.activationWindow.indexStart,
-                emitter.activationWindow.indexEnd,
-            );
-        } );
-
-        this.commonUniforms.uActivationWindow = this.emitters.map( emitter => {
-            return emitter.activationWindow.value;
-        } );
+        this.emitterStore.add( emitter );
 
         // Set texture size which will trigger a re-creation
         // of the GPUComputionRenderer and its associated
         // data textures
-        this.setTextureSize( textureSize );
+        this.setTextureSize( this.emitterStore.requiredTextureSize );
 
         // Re-create the position and UV buffer attributes
         // this.setPositionBufferAttribute();
         // this.setUVBufferAttribute();
 
-       this.assignEmitterUniforms();
+        // this.assignEmitterUniforms();
+
+        // Set number of emitter #define statements so each compute shader
+        // knows how many emitters it's working with.
+        ( this.gpuCompute.variables as Variable[] ).forEach( v => {
+            v.material.defines.EMITTER_COUNT = this.emitterStore.store.length;
+        } );
     }
 
     addDebugPlanesToScene( scene: Scene, size: number = 50 ): void {
@@ -425,17 +439,12 @@ export class ParticleEngineCompute {
         } );
     }
 
-    update( deltaTime: number, time: number ): void {
+    update( deltaTime: number, runTime: number ): void {
         // Update uTime uniform (common to all compute passes)
-        this.commonUniforms.uTime.x = deltaTime;
-        this.commonUniforms.uTime.y = time;
+        this.commonUniforms.uTime.value.set( deltaTime, runTime );
 
         // Update all emitters
-        this.emitters.forEach( ( emitter, i ) => {
-            emitter.update( deltaTime, this.particleCount );
-
-            this.dataTextureVariables[ TextureName.SPAWN ].material.uniforms.uEmitterActive.value[ i ] = emitter.active;
-        } );
+        this.emitterStore.update( deltaTime, runTime );
 
         // Compute all textures
         this.gpuCompute.compute();

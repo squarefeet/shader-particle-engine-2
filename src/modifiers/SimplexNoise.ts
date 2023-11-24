@@ -1,8 +1,9 @@
 import { Vector3, Vector4 } from 'three';
 import { Modifier } from './Modifier';
+import { ModifierBitFlags } from './bit-flags';
 
 export class SimplexNoiseModifier extends Modifier<Vector4 | Vector3> {
-    bitFlag = 1 << 2;
+    bitFlag = ModifierBitFlags.SIMPLEX_NOISE;
 
     defines = {
         MOD_SIMPLEX_NOISE: true

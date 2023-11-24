@@ -27,6 +27,7 @@ import {
 import { SphereDistribution } from './distributions/SphereDistribution';
 import { LineDistribution } from './distributions/LineDistribution';
 import { AccelerationModifier } from './modifiers/AccelerationModifier';
+import { AttractorModifier } from './modifiers/AttractorModifier';
 import { SimplexNoiseModifier } from './modifiers/SimplexNoise';
 import { DragModifier } from './modifiers/DragModifier';
 import { BoxDistribution } from './distributions/BoxDistribution';
@@ -37,13 +38,19 @@ document.body.appendChild( stats.dom );
 const compute = new ParticleEngineCompute( renderer );
 
 // First emitter...
-const emitter0 = new Emitter( 10000, 1, 10 );
-emitter0.positionInitial.origin.set( 1000, 0, 0 );
+const emitter0 = new Emitter( 10000, 1, 20 );
+emitter0.positionInitial.origin.set( 0, 0, 0 );
 emitter0.velocityInitial.distribution = new SphereDistribution(
-    new Vector3( 100, 100, 100 ),
-    new Vector3( 100, 100, 100 ),
+    new Vector3( 10, 10, 10 ),
+    new Vector3( 10, 10, 10 ),
 );
-emitter0.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -10, 0 ) ) );
+
+// emitter0.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -100, 0 ) ) );
+const attractorModifier = new AttractorModifier();
+attractorModifier.addAttractor( new Vector3( 0, 250, 0 ), 10000 );
+attractorModifier.addAttractor( new Vector3( 0, -250, 0 ), 10000 );
+
+emitter0.addVelocityModifier( attractorModifier );
 compute.addEmitter( emitter0 );
 
 const emitter1 = new Emitter( 10000, 1, 10 );
@@ -55,13 +62,13 @@ emitter1.addVelocityModifier( new SimplexNoiseModifier(
     new Vector4(
         124, // uNoiseTime
         0.007, // uNoisePositionScale // 0.001
-        50.0, // uNoiseVelocityScale 
+        50.0, // uNoiseVelocityScale
         0.0, // uNoiseTurbulance
     ),
     new Vector3( 1, 1, 1 ),
 ) );
 // emitter1.addVelocityModifier( new DragModifier( 0.05 ) );
-emitter1.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -10, 0 ) ) );
+// emitter1.addVelocityModifier( new AccelerationModifier( new Vector3( 0, 10, 0 ) ) );
 // compute.addEmitter( emitter1 );
 
 
@@ -143,7 +150,7 @@ function tick( time: DOMHighResTimeStamp ) {
     const dt = ( t - previousTime );
     previousTime = t;
     manualTime += dt;
-    
+
     controls.update( dt );
 
     // camera.position.x = Math.sin( t * 0.5 ) * 1500;

@@ -3,18 +3,22 @@ import { Modifier } from './Modifier';
 
 export class Modifiers {
     storage: Modifier<unknown>[] = [];
-    bitMask: number = 0;
+    uniforms: Record<string, IUniform> = {
+        uModifierBitMask: {
+            value: 0
+        },
+    };
 
     private hasBitFlag( bitFlag: number ) {
-        return ( this.bitMask & bitFlag ) !== 0;
+        return ( this.uniforms.uModifierBitMask.value & bitFlag ) !== 0;
     }
 
     private setBitFlag( bitFlag: number ) {
-        this.bitMask |= bitFlag;
+        this.uniforms.uModifierBitMask.value |= bitFlag;
     }
 
     private clearBitFlag( bitFlag: number ) {
-        this.bitMask &= ~bitFlag;
+        this.uniforms.uModifierBitMask.value &= ~bitFlag;
     }
 
     // Checks whether the given modifier already exists
@@ -60,15 +64,19 @@ export class Modifiers {
     }
 
     generateUniforms() {
+        const uniforms: Record<string, IUniform> = {
+            uModifierBitMask: this.uniforms.uModifierBitMask,
+        };
+
         return this.storage.reduce( ( uniforms, modifier ) => {
             Object.entries( modifier.uniforms ).forEach( ( [ uniformName, value ] ) => {
                 uniforms[ uniformName ] = value;
             } );
 
             return uniforms;
-        }, {} as Record<string, IUniform>);
+        }, uniforms );
     }
-    
+
     update( deltaTime: number, runTime: number ) {
         for( let i = 0, il = this.storage.length; i < il; ++i ) {
             this.storage[ i ].update( deltaTime, runTime );

@@ -1,7 +1,8 @@
 import { Modifier } from './Modifier';
+import { ModifierBitFlags } from './bit-flags';
 
 export class DragModifier extends Modifier<number> {
-    bitFlag = 1 << 1;
+    bitFlag = ModifierBitFlags.DRAG;
 
     defines = {
         MOD_DRAG: true

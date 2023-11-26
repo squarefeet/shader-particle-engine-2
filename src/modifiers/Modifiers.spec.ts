@@ -26,14 +26,14 @@ describe( 'Modifiers', () => {
     // the @ts-ignore statements.
     describe( 'bitMasking', () => {
         it( 'will initialise bit mask with 0 value', () => {
-            expect( modifiers.bitMask ).to.equal( 0 );
+            expect( modifiers.uniforms.uModifierBitMask.value ).to.equal( 0 );
         } );
 
         describe( 'setting bit flag', () => {
             it( 'will set a flag', () => {
                 /* @ts-ignore-line */
                 modifiers.setBitFlag( 1 << 1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '10' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '10' );
             } );
 
             it( 'will set multiple flags', () => {
@@ -41,7 +41,7 @@ describe( 'Modifiers', () => {
                 modifiers.setBitFlag( 1 << 0 );
                 /* @ts-ignore-line */
                 modifiers.setBitFlag( 1 << 1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '11' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '11' );
             } );
 
             it( 'setting the same flag more than once will not affect the mask', () => {
@@ -51,7 +51,7 @@ describe( 'Modifiers', () => {
                 modifiers.setBitFlag( 1 << 1 );
                 /* @ts-ignore-line */
                 modifiers.setBitFlag( 1 << 1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '11' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '11' );
             } );
         } );
 
@@ -80,7 +80,7 @@ describe( 'Modifiers', () => {
                 modifiers.setBitFlag( 1 << 1 );
                 /* @ts-ignore-line */
                 modifiers.clearBitFlag( 1 << 1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '0' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '0' );
             } );
 
             it( 'will clear the correct flags', () => {
@@ -90,7 +90,7 @@ describe( 'Modifiers', () => {
                 modifiers.setBitFlag( 1 << 1 );
                 /* @ts-ignore-line */
                 modifiers.clearBitFlag( 1 << 0 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '10' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '10' );
             } );
 
             it( 'clearing the same flag more than once will not affect the mask', () => {
@@ -100,11 +100,11 @@ describe( 'Modifiers', () => {
                 modifiers.setBitFlag( 1 << 1 );
                 /* @ts-ignore-line */
                 modifiers.clearBitFlag( 1 << 1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '1' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '1' );
 
                 /* @ts-ignore-line */
                 modifiers.clearBitFlag( 1 << 1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '1' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '1' );
             } );
         } );
     } );
@@ -127,14 +127,14 @@ describe( 'Modifiers', () => {
                 modifiers.add( modifier1 );
                 modifiers.add( modifier2 );
                 expect( modifiers.storage ).to.deep.equal( [ modifier1, modifier2 ] );
-            } );    
+            } );
 
             it( 'will not add two modifiers of the same constructor', () => {
                 modifiers.add( modifier1 );
                 modifiers.add( new TestModifier1( 0, 'uTestModifier1' ) );
                 expect( modifiers.storage ).to.deep.equal( [ modifier1 ] );
             } );
-            
+
             it( 'will not add two modifiers with the same bitFlag', () => {
                 modifiers.add( modifier1 );
                 modifiers.add( new DuplicateBitFlagModifier( 0, 'uDuplicateModifier1' ) );
@@ -142,9 +142,9 @@ describe( 'Modifiers', () => {
             } );
 
             it( 'will update the bitMask with the added modifier\'s bitFlag', () => {
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '0' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '0' );
                 modifiers.add( modifier1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.equal( '1' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.equal( '1' );
             } );
         } );
 
@@ -163,9 +163,9 @@ describe( 'Modifiers', () => {
 
             it( 'will clear bitFlag on removal', () => {
                 modifiers.add( modifier1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.deep.equal( '1' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.deep.equal( '1' );
                 modifiers.remove( modifier1 );
-                expect( modifiers.bitMask.toString( 2 ) ).to.deep.equal( '0' );
+                expect( modifiers.uniforms.uModifierBitMask.value.toString( 2 ) ).to.deep.equal( '0' );
             } );
         } );
     } );
@@ -174,9 +174,10 @@ describe( 'Modifiers', () => {
         it( 'will generate uniforms', () => {
             modifiers.add( modifier1 );
             modifiers.add( modifier2 );
-            
+
             const generatedUniforms = modifiers.generateUniforms();
             expect( generatedUniforms ).to.deep.equal( {
+                uModifierBitMask: { value: 3 },
                 uTestModifier1: { value: 2 },
                 uTestModifier2: { value: 81 },
             } );
@@ -185,12 +186,13 @@ describe( 'Modifiers', () => {
         it( 'will allow modifier values to be changed after uniform generation', () => {
             modifiers.add( modifier1 );
             modifiers.add( modifier2 );
-            
+
             const generatedUniforms = modifiers.generateUniforms();
 
             modifier1.value = 100;
 
             expect( generatedUniforms ).to.deep.equal( {
+                uModifierBitMask: { value: 3 },
                 uTestModifier1: { value: 100 },
                 uTestModifier2: { value: 81 },
             } );

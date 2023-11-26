@@ -1,8 +1,9 @@
 import { Vector3 } from 'three';
 import { Modifier } from './Modifier';
+import { ModifierBitFlags } from './bit-flags';
 
 export class AccelerationModifier extends Modifier<Vector3> {
-    bitFlag = 1 << 0;
+    bitFlag = ModifierBitFlags.ACCELERATION;
 
     defines = {
         MOD_ACCELERATION: true

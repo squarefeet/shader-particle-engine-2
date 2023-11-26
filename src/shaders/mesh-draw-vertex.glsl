@@ -29,7 +29,7 @@ void main() {
     vec3 endColor = normalize( vec3( 0.5, 0.9, 0.1 ) ) * 2.0;
     float normalisedAge = age / maxAge;
     vec3 color = mix( startColor, endColor, normalisedAge );
-                
+
     vColor = vec4(
         color,
         alive * ( 1.0 - normalisedAge )
@@ -39,7 +39,7 @@ void main() {
         vColor.w = 0.0;
     }
 
-    vec3 transformed = vec3( ( position * vColor.w) + particlePosition );
+    vec3 transformed = vec3( ( position * vColor.w ) + particlePosition );
 
     vPosition = vec4( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
 

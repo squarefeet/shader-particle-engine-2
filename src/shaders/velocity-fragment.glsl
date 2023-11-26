@@ -28,7 +28,7 @@ uniform vec3[EMITTER_COUNT] uDistributionMin;
 uniform vec3[EMITTER_COUNT] uDistributionMax;
 uniform int[EMITTER_COUNT] uDistributionType;
 
-uniform int[EMITTER_COUNT] uModBitMask;
+uniform uint[EMITTER_COUNT] uModifierBitMask;
 
 #ifdef MOD_ACCELERATION
     uniform vec3[EMITTER_COUNT] uModAcceleration;
@@ -38,26 +38,11 @@ uniform int[EMITTER_COUNT] uModBitMask;
     uniform float[EMITTER_COUNT] uModDrag;
 #endif
 
-/*
-    Another array, this contains the values for
-    each emitter's acceleration. Using the same
-    set up as above, the values would be:
-
-    [
-        vec3( x0, y0, z0 ),
-        vec3( x1, y1, z1 )
-    ]
-
-    If one of the emitters doesn't have acceleration
-    enabled, it will just contain a zeroed-out vector.
-*/
-// uniform vec3[EMITTER_COUNT] uAcceleration;
-
 /**
  * Modifiers that can have more than one entry per emitter
  * are defined as matrices. This means that these modifiers
  * can only have a maximum of 4 members.
- * 
+ *
  * mat4(
  *     vec4( 0, 0, 0, 0 ), // attractor 1
  *     vec4( 0, 0, 0, 0 ), // attractor 2
@@ -65,7 +50,9 @@ uniform int[EMITTER_COUNT] uModBitMask;
  *     vec4( 0, 0, 0, 0 ), // attractor 4
  * );
  */
-// uniform mat4[EMITTER_COUNT] uAttractors;
+#ifdef MOD_ATTRACTORS
+    uniform mat4[EMITTER_COUNT] uModAttractors;
+#endif
 
 #ifdef MOD_SIMPLEX_NOISE
     uniform vec4[EMITTER_COUNT] uModNoiseParams;
@@ -73,10 +60,15 @@ uniform int[EMITTER_COUNT] uModBitMask;
     // uniform vec3[EMITTER_COUNT] uNoiseScale;
 #endif
 
+// Define all modifier bit flags as unsigned ints.
+const uint MOD_ACCELERATION_FLAG = 1u << 0;
+const uint MOD_DRAG_FLAG = 1u << 1;
+const uint MOD_SIMPLEX_NOISE_FLAG = 1u << 2;
+const uint MOD_ATTRACTOR_FLAG = 1u << 3;
 
 #ifdef MOD_SIMPLEX_NOISE
     #define F4 0.309016994374947451
-    #define OCTAVES 2
+    #define OCTAVES 3
 
     vec4 mod289(vec4 x) {
         return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -184,10 +176,6 @@ uniform int[EMITTER_COUNT] uModBitMask;
     }
 
     vec3 calculateNoiseVelocity( vec3 currentPosition, vec4 uModNoiseParamsValue, vec3 uModNoiseScaleValue ) {
-        if( length( uModNoiseParamsValue ) == 0.0 ) {
-            return vec3( 0.0 );
-        }
-
         float uNoiseTime = uModNoiseParamsValue.x;
         float uNoisePositionScale = uModNoiseParamsValue.y;
         // vec3 uNoiseVelocityScale = uNoiseScaleValue;
@@ -195,7 +183,6 @@ uniform int[EMITTER_COUNT] uModBitMask;
         float uNoiseTurbulance = uModNoiseParamsValue.w;
 
         vec3 noisePosition = currentPosition * uNoisePositionScale;
-        float noiseTime = uNoiseTime;
 
         vec4 xNoisePotentialDerivatives = vec4(0.0);
         vec4 yNoisePotentialDerivatives = vec4(0.0);
@@ -221,15 +208,15 @@ uniform int[EMITTER_COUNT] uModBitMask;
             float scaleMultiplier = noiseScale * scale;
 
             xNoisePotentialDerivatives += simplexNoiseDerivatives(
-                vec4(noisePosition * octaveValue, noiseTime)
+                vec4(noisePosition * octaveValue, uNoiseTime)
             ) * scaleMultiplier;
 
             yNoisePotentialDerivatives += simplexNoiseDerivatives(
-                vec4((noisePosition + yDerivativeAdjustment) * octaveValue, noiseTime)
+                vec4((noisePosition + yDerivativeAdjustment) * octaveValue, uNoiseTime)
             ) * scaleMultiplier;
 
             zNoisePotentialDerivatives += simplexNoiseDerivatives(
-                vec4((noisePosition + zDerivativeAdjustment) * octaveValue, noiseTime)
+                vec4((noisePosition + zDerivativeAdjustment) * octaveValue, uNoiseTime)
             ) * scaleMultiplier;
         }
 
@@ -245,7 +232,25 @@ uniform int[EMITTER_COUNT] uModBitMask;
     }
 #endif
 
+#ifdef MOD_ATTRACTORS
+    vec3 calculateAttractors( vec3 position, mat4 attractors ) {
+        vec3 attraction = vec3( 0.0 );
 
+        for( int i = 0; i < 3; ++i ) {
+            vec4 attractor = vec4( attractors[ i ] );
+            float force = attractor.w;
+            vec3 dPos = attractor.xyz - position;
+            float distance = length( dPos );
+
+            float distanceSq = distance * distance;
+            float attractionForce = force / distanceSq;
+
+            attraction += attractionForce * normalize( dPos );
+        }
+
+        return attraction;
+    }
+#endif
 
 /**
  * Given an emitter start and end range (defined as `vec2(start, end)`),
@@ -292,7 +297,7 @@ vec3 randomBoxDistribution( float seed, vec3 minSize, vec3 maxSize ) {
     return ( random * maxSize ) - maxSize * 0.5;
 }
 
-vec3 randomSphereDistribution( float seed, vec3 minSize, vec3 maxSize, vec3 initialValue, vec3 position ) {
+vec3 randomSphereDistribution( float seed, vec3 minSize, vec3 maxSize ) {
     rng_state = uint( seed );
     vec3 random = vec3(PCGHash(), PCGHash(), PCGHash()) / float(0xFFFFFFFFU) * 2.0 - 1.0;
 
@@ -342,8 +347,7 @@ vec3 getInitialValue(
 ) {
     // NONE
     if( distType == 0 ) {
-        // return initialValue;
-        return vec3( 0.0 );
+        return initialValue;
     }
 
     // RANDOM
@@ -358,8 +362,7 @@ vec3 getInitialValue(
 
     // SPHERE
     else if( distType == 3 ) {
-        return initialValue + randomSphereDistribution( seed, minSize, maxSize, initialValue, position );
-        // return initialValue + randomBoxDistribution( seed, minSize, maxSize );
+        return initialValue + randomSphereDistribution( seed, minSize, maxSize );
     }
 
     // LINE
@@ -367,7 +370,7 @@ vec3 getInitialValue(
         return initialValue + randomLineDistribution( seed, minSize, maxSize );
     }
 
-    return vec3( 1000.0 );
+    return initialValue;
 }
 
 /**
@@ -395,6 +398,7 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
     // Loop through all emitters...
     for( int i = 0; i < EMITTER_COUNT; ++i ) {
+        uint modifierBitMask = uModifierBitMask[ i ];
         bool isWithinEmitterRange = withinEmitterRange( uEmitterIndexRange[ i ], particleIndex );
 
         // If the current particleIndex does not fall within this emitter range,
@@ -419,20 +423,33 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
         // Particle is alive, so apply the relevant forces
         else if( particleIsLiving( alive, age ) ) {
             #ifdef MOD_ACCELERATION
-                velocity += uModAcceleration[ i ] * deltaTime;
+                if( ( modifierBitMask & MOD_ACCELERATION_FLAG ) != 0u ) {
+                    velocity += uModAcceleration[ i ] * deltaTime;
+                }
+            #endif
+
+            #ifdef MOD_ATTRACTORS
+                if( ( modifierBitMask & MOD_ATTRACTOR_FLAG ) != 0u ) {
+                    velocity += calculateAttractors( position, uModAttractors[ i ] ) * deltaTime;
+                }
             #endif
 
             // TODO: Would it be more efficient to add a branch to check against the
             // uModBitMask uniform here? I'm assuming so since a branch _should_ be
             // less expensive than computing simplex noise...
             #ifdef MOD_SIMPLEX_NOISE
-                // if( hasBitFlag( uModBitMask, 1 << 3 ) ) ...
-                velocity += calculateNoiseVelocity( position, uModNoiseParams[ i ], uModNoiseScale[ i ] ) * deltaTime;
+                if( ( modifierBitMask & MOD_SIMPLEX_NOISE_FLAG ) != 0u ) {
+                    velocity += calculateNoiseVelocity( position, uModNoiseParams[ i ], uModNoiseScale[ i ] ) * deltaTime;
+                }
             #endif
 
             #ifdef MOD_DRAG
-                velocity *= 1.0 - uModDrag[ i ];
+                if( ( modifierBitMask & MOD_DRAG_FLAG ) != 0u ) {
+                    velocity *= 1.0 - uModDrag[ i ];
+                }
             #endif
+
+            // velocity = clamp( velocity, vec3( -100.0 ), vec3( 100.0 ) );
         }
         else {
             velocity = vec3( 0.0 );

@@ -1,49 +1,48 @@
-import { AdditiveBlending, BufferAttribute, BufferGeometry, IUniform, Points, ShaderMaterial, Vector2 } from 'three';
-import drawVertexShader from './shaders/points-draw-vertex.glsl?raw';
-import drawFragmentShader from './shaders/points-draw-fragment.glsl?raw';
+import {
+    BufferAttribute,
+    BufferGeometry,
+    Points,
+} from 'three';
 import { ParticleEngineCompute } from './Compute';
+import { PointsDistanceMaterial } from './materials/PointsDistanceMaterial';
+import { PointsDepthMaterial } from './materials/PointsDepthMaterial';
+import { PointsMaterial } from './materials/PointsMaterial';
 
 export class PointsRenderer {
     compute: ParticleEngineCompute;
     geometry: BufferGeometry;
-    material: ShaderMaterial;
+    material: PointsMaterial;
     mesh: Points;
-
-    uniforms: Record<string, IUniform> = {
-        tPosition: { value: null },
-        tVelocity: { value: null },
-        tSpawn: { value: null },
-        uTime: { value: new Vector2() },
-        tDiffuse: { value: null },
-    };
 
     constructor( compute: ParticleEngineCompute ) {
         this.compute = compute;
         this.geometry = new BufferGeometry();
-        this.material = new ShaderMaterial( {
-            uniforms: this.uniforms,
-            vertexShader: drawVertexShader,
-            fragmentShader: drawFragmentShader,
-            blending: AdditiveBlending,
-            depthTest: false,
-            depthWrite: false,
-            transparent: true,
-            vertexColors: false,
-        } );
-
-        this.material.extensions.drawBuffers = false;
+        this.material = new PointsMaterial();
 
         this.mesh = new Points( this.geometry, this.material );
         this.mesh.matrixAutoUpdate = false;
         this.mesh.frustumCulled = false;
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
+
+        this.mesh.customDistanceMaterial = new PointsDistanceMaterial();
+        this.mesh.customDepthMaterial = new PointsDepthMaterial();
 
         this.updateBufferAttributes();
     }
 
     private updateTextureUniforms() {
-        this.uniforms.tPosition.value = this.compute.tPositionTexture;
-        this.uniforms.tVelocity.value = this.compute.tVelocityTexture;
-        this.uniforms.tSpawn.value = this.compute.tSpawnTexture;
+        const distanceMaterial = this.mesh.customDistanceMaterial as PointsDistanceMaterial;
+        const depthMaterial = this.mesh.customDepthMaterial as PointsDepthMaterial;
+
+        distanceMaterial.updateTexture( this.compute.tPositionTexture );
+        depthMaterial.updateTexture( this.compute.tPositionTexture );
+
+        this.material.updateTextures(
+            this.compute.tPositionTexture,
+            this.compute.tVelocityTexture,
+            this.compute.tSpawnTexture,
+        );
     }
 
     // Call this if adding a new emitter after creating an instance of this class.
@@ -53,12 +52,9 @@ export class PointsRenderer {
 
         this.geometry.setAttribute( 'position', new BufferAttribute( positionAttr, 3 ) );
         this.geometry.setAttribute( 'uv', new BufferAttribute( uvAttr, 2 ) );
-    
     }
 
-    update( deltaTime: number, runTime: number ) {
-        this.uniforms.uTime.value.x = deltaTime;
-        this.uniforms.uTime.value.y = runTime;
+    update( _deltaTime: number, _runTime: number ) {
         this.updateTextureUniforms();
     }
 }

@@ -46,13 +46,9 @@ export class AttractorModifier extends Modifier<Matrix4> {
         }
 
         const start = index * 4;
-        const end = start + 4;
-
-        for( let i = start; i < end; ++i ) {
-            this.value.elements[ i + 0 ] = 0;
-            this.value.elements[ i + 1 ] = 0;
-            this.value.elements[ i + 2 ] = 0;
-            this.value.elements[ i + 3 ] = 0;
-        }
+        this.value.elements[ start + 0 ] = 0;
+        this.value.elements[ start + 1 ] = 0;
+        this.value.elements[ start + 2 ] = 0;
+        this.value.elements[ start + 3 ] = 0;
     }
 }

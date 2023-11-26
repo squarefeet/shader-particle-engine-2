@@ -67,7 +67,7 @@ vec2 getSpawnWindow( vec4 spawnValue, vec2 emitterIndexRange, float totalParticl
 
     float start = floor( spawnRate * runTime ) * burstRate;
     start = mod( start, emitterParticleCount );
-    
+
     float particlesPerTick = floor( spawnRate * deltaTime );
     // float particlesPerTick = 0.0;
 
@@ -139,7 +139,7 @@ void main() {
             age = 0.0;
 
             // TODO
-            // - 
+            // -
             // maxAge = maxAge;
         }
         else if( alive == 1.0 && age < maxAge ) {

@@ -68,7 +68,7 @@ const uint MOD_ATTRACTOR_FLAG = 1u << 3;
 
 #ifdef MOD_SIMPLEX_NOISE
     #define F4 0.309016994374947451
-    #define OCTAVES 2
+    #define OCTAVES 3
 
     vec4 mod289(vec4 x) {
         return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -176,10 +176,6 @@ const uint MOD_ATTRACTOR_FLAG = 1u << 3;
     }
 
     vec3 calculateNoiseVelocity( vec3 currentPosition, vec4 uModNoiseParamsValue, vec3 uModNoiseScaleValue ) {
-        if( length( uModNoiseParamsValue ) == 0.0 ) {
-            return vec3( 0.0 );
-        }
-
         float uNoiseTime = uModNoiseParamsValue.x;
         float uNoisePositionScale = uModNoiseParamsValue.y;
         // vec3 uNoiseVelocityScale = uNoiseScaleValue;
@@ -187,7 +183,6 @@ const uint MOD_ATTRACTOR_FLAG = 1u << 3;
         float uNoiseTurbulance = uModNoiseParamsValue.w;
 
         vec3 noisePosition = currentPosition * uNoisePositionScale;
-        float noiseTime = uNoiseTime;
 
         vec4 xNoisePotentialDerivatives = vec4(0.0);
         vec4 yNoisePotentialDerivatives = vec4(0.0);
@@ -213,15 +208,15 @@ const uint MOD_ATTRACTOR_FLAG = 1u << 3;
             float scaleMultiplier = noiseScale * scale;
 
             xNoisePotentialDerivatives += simplexNoiseDerivatives(
-                vec4(noisePosition * octaveValue, noiseTime)
+                vec4(noisePosition * octaveValue, uNoiseTime)
             ) * scaleMultiplier;
 
             yNoisePotentialDerivatives += simplexNoiseDerivatives(
-                vec4((noisePosition + yDerivativeAdjustment) * octaveValue, noiseTime)
+                vec4((noisePosition + yDerivativeAdjustment) * octaveValue, uNoiseTime)
             ) * scaleMultiplier;
 
             zNoisePotentialDerivatives += simplexNoiseDerivatives(
-                vec4((noisePosition + zDerivativeAdjustment) * octaveValue, noiseTime)
+                vec4((noisePosition + zDerivativeAdjustment) * octaveValue, uNoiseTime)
             ) * scaleMultiplier;
         }
 
@@ -246,10 +241,6 @@ const uint MOD_ATTRACTOR_FLAG = 1u << 3;
             float force = attractor.w;
             vec3 dPos = attractor.xyz - position;
             float distance = length( dPos );
-
-            if( distance < 50.0 ) {
-                continue;
-            }
 
             float distanceSq = distance * distance;
             float attractionForce = force / distanceSq;
@@ -356,8 +347,7 @@ vec3 getInitialValue(
 ) {
     // NONE
     if( distType == 0 ) {
-        // return initialValue;
-        return vec3( 0.0 );
+        return initialValue;
     }
 
     // RANDOM
@@ -380,7 +370,7 @@ vec3 getInitialValue(
         return initialValue + randomLineDistribution( seed, minSize, maxSize );
     }
 
-    return vec3( 1000.0 );
+    return initialValue;
 }
 
 /**
@@ -440,7 +430,7 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
             #ifdef MOD_ATTRACTORS
                 if( ( modifierBitMask & MOD_ATTRACTOR_FLAG ) != 0u ) {
-                    velocity += calculateAttractors( position, uModAttractors[ i ] );
+                    velocity += calculateAttractors( position, uModAttractors[ i ] ) * deltaTime;
                 }
             #endif
 
@@ -459,7 +449,10 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
                 }
             #endif
 
-            // velocity = clamp( velocity, vec3( -500.0 ), vec3( 500.0 ) );
+            // velocity = clamp( velocity, vec3( -100.0 ), vec3( 100.0 ) );
+        }
+        else {
+            velocity = vec3( 0.0 );
         }
 
         // Dead particles have already been eliminated so no

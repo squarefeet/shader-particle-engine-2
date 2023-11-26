@@ -1,4 +1,4 @@
-import { IUniform, Vector2, Vector3, Vector4 } from 'three';
+import { IUniform, Matrix4, Vector2, Vector3, Vector4 } from 'three';
 import { Emitter } from './Emitter';
 import { TextureName } from './constants/textures';
 
@@ -42,7 +42,7 @@ export class EmitterStore {
         uDistributionType: { value: [] },
     };
 
-    uniformsPosition: Record<string, IUniform<UniformValue[]>> = {    
+    uniformsPosition: Record<string, IUniform<UniformValue[]>> = {
         uInitialOrigin: { value: [] },
         uDistributionMin: { value: [] },
         uDistributionMax: { value: [] },
@@ -61,7 +61,7 @@ export class EmitterStore {
     private calculateTextureSize() {
         // For ease, ensure we're working with at least a 2x2 texture, or if
         // greater than that size, round it up to the nearest square whole number.
-        // This will likely create a texture size larger than we need, so this 
+        // This will likely create a texture size larger than we need, so this
         // could be optimised in the future.
         this.requiredTextureSize = Math.max(
             2,
@@ -98,7 +98,7 @@ export class EmitterStore {
 
         Object.values( modifierUniforms ).forEach( ( uniform: IUniform ) => {
             const existingValue = uniform.value.find( ( d: unknown ) => !!d );
-            
+
             uniform.value = uniform.value.map( ( d: unknown ) => {
                 if( d ) {
                     return d;
@@ -108,6 +108,12 @@ export class EmitterStore {
                     case Vector2: return new Vector2( 0, 0 );
                     case Vector3: return new Vector3( 0, 0, 0 );
                     case Vector4: return new Vector4( 0, 0, 0, 0 );
+                    case Matrix4: return new Matrix4(
+                        0, 0, 0, 0,
+                        0, 0, 0, 0,
+                        0, 0, 0, 0,
+                        0, 0, 0, 0,
+                    );
                     case Number: return 0;
                     case Boolean: return false;
                 }
@@ -169,7 +175,7 @@ export class EmitterStore {
             this.uniformsPosition.uDistributionMax.value.push( distribution ? distribution.max : new Vector3() );
             this.uniformsPosition.uDistributionType.value.push( distribution ? distribution.type : 0 );
         }
-        
+
         if( this.hasVelocityDistribution ) {
             const distribution = emitter.velocityInitial.distribution;
             this.uniformsVelocity.uDistributionMin.value.push( distribution ? distribution.min : new Vector3() );
@@ -220,7 +226,7 @@ export class EmitterStore {
             emitter.update( deltaTime, runTime, this.particleCount );
 
             // Update uniforms
-            this.uniformsSpawn.uEmitterActive.value[ i ] = emitter.active;            
+            this.uniformsSpawn.uEmitterActive.value[ i ] = emitter.active;
         }
     }
 }

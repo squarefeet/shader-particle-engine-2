@@ -32,8 +32,10 @@ const controls = new OrbitControls( camera, renderer.domElement );
 // Setup those bits n bobs
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-camera.position.y = 0;
-camera.position.z = 1000;
+camera.position.y = 50;
+camera.position.x = 50;
+camera.position.z = 100;
+camera.position.multiplyScalar( 0.8 );
 camera.lookAt( new Vector3( 0, 0, 0 ) );
 stats.showPanel( 0 );
 

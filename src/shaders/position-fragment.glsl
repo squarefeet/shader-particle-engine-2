@@ -190,6 +190,46 @@ vec3 applyModifiers( vec3 position, vec3 velocity, vec4 spawn ) {
     return position;
 }
 
+// https://github.com/d3/d3-interpolate/blob/main/src/basis.js
+float bezierInterpolationBasis( float t1, float v0, float v1, float v2, float v3 ) {
+    float t2 = t1 * t1;
+    float t3 = t2 * t1;
+
+    return (
+        (1.0 - 3.0 * t1 + 3.0 * t2 - t3) * v0
+        + (4.0 - 6.0 * t2 + 3.0 * t3) * v1
+        + (1.0 + 3.0 * t1 + 3.0 * t2 - 3.0 * t3) * v2
+        + t3 * v3
+    ) / 6.0;
+}
+
+float bezierInterpolation( float t, float values[ 7 ] ) {
+    int n = 7;
+    int i = 0;
+
+    if( t <= 0.0 ) {
+        i = 0;
+        t = 0.0;
+    }
+    else if( t >= 1.0 ) {
+        t = 1.0;
+        i = n - 1;
+    }
+    else {
+        i = int( t * float( n ) );
+    }
+
+    float v1 = values[ i ];
+    float v2 = values[ i + 1 ];
+    float v0 = i > 0 ? values[ i - 1 ] : 2.0 * v1 - v2;
+    float v3 = i < n - 1 ? values[ i + 2 ] : 2.0 * v2 - v1;
+
+    return bezierInterpolationBasis(
+        ( t - float( i ) / float( n ) ) * float( n ),
+        v0, v1, v2, v3
+    );
+}
+
 void main() {
     // Calculate the uv coords for this particle.
     vec2 uv = gl_FragCoord.xy / resolution.xy;
@@ -200,13 +240,31 @@ void main() {
 
     // Unpack position value
     vec3 position = positionTextureValue.xyz;
-    float UNUSED_POSITION_W = positionTextureValue.w;
+
+    // Unpack spawn value
+    float age = spawnTextureValue.x;
+    float maxAge = spawnTextureValue.y;
+    float alive = spawnTextureValue.z;
+    float normalisedAge = clamp( age / maxAge, 0.0, 1.0 );
+
+    float sizeSteps[7] = float[7]( 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 );
+
+    // float size = mix( startSize, endSize, steppedAge );
+    float size = bezierInterpolation( normalisedAge, sizeSteps );
+    // float size = 0.0 + (1.0 - normalisedAge);
+    // float size = length( velocityTextureValue.xyz );
+    // float size = 1.0;
+
+    // Calculate size
+    // float size = 1000.0 * (1.0 - normalisedAge);
+    // float size = 2.0 * ( 1.0 - normalisedAge );
+    // float size = 2.0;
+
 
     // Unpack velocity value
     vec3 velocity = velocityTextureValue.xyz;
-    float UNUSED_VELOCITY_W = velocityTextureValue.w;
 
     position = applyModifiers( position, velocity, spawnTextureValue );
 
-    gl_FragColor = vec4( position, UNUSED_POSITION_W );
+    gl_FragColor = vec4( position, size * alive );
 }

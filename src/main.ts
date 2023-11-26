@@ -1,5 +1,22 @@
 import './style.css';
 import {
+    ACESFilmicToneMapping,
+    AmbientLight,
+    CameraHelper,
+    DirectionalLight,
+    DirectionalLightHelper,
+    HemisphereLight,
+    Mesh,
+    MeshLambertMaterial,
+    MeshPhongMaterial,
+    PCFSoftShadowMap,
+    PlaneGeometry,
+    SphereGeometry,
+    SpotLight,
+    Vector3,
+    Vector4,
+} from 'three';
+import {
     camera,
     scene,
     renderer,
@@ -9,83 +26,45 @@ import {
 import { Emitter } from './Emitter';
 import { ParticleEngineCompute } from './Compute';
 import { PointsRenderer } from './PointsRenderer';
-import { MeshRenderer } from './MeshRenderer';
-import {
-    BoxGeometry,
-    DirectionalLight,
-    HemisphereLight,
-    Mesh,
-    MeshBasicMaterial,
-    MeshLambertMaterial,
-    MeshPhongMaterial,
-    PlaneGeometry,
-    PointLight,
-    SphereGeometry,
-    Vector3,
-    Vector4,
-} from 'three';
 import { SphereDistribution } from './distributions/SphereDistribution';
-import { LineDistribution } from './distributions/LineDistribution';
-import { AccelerationModifier } from './modifiers/AccelerationModifier';
-import { AttractorModifier } from './modifiers/AttractorModifier';
 import { SimplexNoiseModifier } from './modifiers/SimplexNoise';
 import { DragModifier } from './modifiers/DragModifier';
-import { BoxDistribution } from './distributions/BoxDistribution';
+
 
 document.body.appendChild( renderer.domElement );
 document.body.appendChild( stats.dom );
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+renderer.toneMapping = ACESFilmicToneMapping;
 
 const compute = new ParticleEngineCompute( renderer );
 
 // First emitter...
-const emitter0 = new Emitter( 10000, 1, 20 );
-emitter0.positionInitial.origin.set( 0, 0, 0 );
-emitter0.velocityInitial.distribution = new SphereDistribution(
-    new Vector3( 10, 10, 10 ),
-    new Vector3( 10, 10, 10 ),
-);
-
-// emitter0.addVelocityModifier( new AccelerationModifier( new Vector3( 0, -100, 0 ) ) );
-const attractorModifier = new AttractorModifier();
-attractorModifier.addAttractor( new Vector3( 0, 250, 0 ), 10000 );
-attractorModifier.addAttractor( new Vector3( 0, -250, 0 ), 10000 );
-
-emitter0.addVelocityModifier( attractorModifier );
-compute.addEmitter( emitter0 );
-
-const emitter1 = new Emitter( 10000, 1, 10 );
+const emitter1 = new Emitter( 300000, 1, 3 );
+emitter1.positionInitial.origin = new Vector3( 0, 40, 0 );
 emitter1.positionInitial.distribution = new SphereDistribution(
-    new Vector3( 50, 0, 0 ),
-    new Vector3( 50, 0, 0 ),
+    new Vector3( 2, 2, 2 ),
+    new Vector3( 2, 2, 2 ),
 );
+emitter1.velocityInitial.distribution = new SphereDistribution(
+    new Vector3( 10, 10, 10 ),
+    new Vector3( 10, 10, 10 ),
+);
+// emitter1.addVelocityModifier( new AccelerationModifier( new Vector3( 0, 2, 0 ) ) );
 emitter1.addVelocityModifier( new SimplexNoiseModifier(
     new Vector4(
-        124, // uNoiseTime
-        0.007, // uNoisePositionScale // 0.001
-        50.0, // uNoiseVelocityScale
-        0.0, // uNoiseTurbulance
+        0, // uNoiseTime
+        0.2, // uNoisePositionScale // 0.001
+        40, // uNoiseVelocityScale
+        0.1, // uNoiseTurbulance
     ),
     new Vector3( 1, 1, 1 ),
 ) );
-// emitter1.addVelocityModifier( new DragModifier( 0.05 ) );
-// emitter1.addVelocityModifier( new AccelerationModifier( new Vector3( 0, 10, 0 ) ) );
-// compute.addEmitter( emitter1 );
 
+emitter1.addVelocityModifier( new DragModifier( 0.2 ) );
+compute.addEmitter( emitter1 );
 
-// Second emitter...
-// const emitter1 = new Emitter( 100, 1, 1 );
-// emitter1.positionInitial.origin = new Vector3( 200, 0, 0 );
-// emitter1.positionInitial.distribution = new SphereDistribution(
-//     new Vector3( 50 ),
-//     new Vector3( 50 ),
-// );
-// emitter1.velocityInitial.distribution = new SphereDistribution(
-//     new Vector3( 100, 0, 0 ),
-//     new Vector3( 100, 0, 0 ),
-// );
-// compute.addEmitter( emitter1 );
-
-compute.addDebugPlanesToScene( scene, 50 );
+// compute.addDebugPlanesToScene( scene, 50 );
 
 // Generate attributes for the MeshRenderer and PointsRenderer
 compute.setPositionBufferAttribute();
@@ -95,47 +74,110 @@ console.log( compute );
 
 // Begin lighting tests
 // --------------------
-// These are some geometries and lights added to the scene
-// to test the mesh renderer's shader
-// const testSphere = new Mesh(
-//     new SphereGeometry( 2 ),
-//     new MeshBasicMaterial( {
-//         color: 0x333333,
-//     } )
-// );
-// testSphere.position.set( 0, 10, -10 );
-// testSphere.castShadow = true;
-// testSphere.receiveShadow = true;
-// scene.add( testSphere );
+const dirLight = new DirectionalLight( 0xffffff, 2 );
+dirLight.castShadow = true;
+dirLight.shadow.camera.left =
+dirLight.shadow.camera.bottom = -100;
+dirLight.shadow.camera.right =
+dirLight.shadow.camera.top = 100;
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 250;
+dirLight.position.set( 0, 100, 0 );
+scene.add( dirLight );
 
-// const pointLight = new PointLight( 0xff0000, 2, 0, 0 );
-// pointLight.position.copy( testSphere.position );
-// scene.add( pointLight );
-
-// const dirLight = new DirectionalLight( 0xffffff, 2 );
-// dirLight.color.setHSL( 0.1, 1, 0.95 );
-// dirLight.position.set( -1, 1.75, 1 );
-// dirLight.position.multiplyScalar( 30 );
-// scene.add( dirLight );
+scene.add( new DirectionalLightHelper( dirLight, 10 ) );
+const helper = new CameraHelper( dirLight.shadow.camera );
+scene.add( helper );
 
 
-// const hemiLight = new HemisphereLight( 0xffffff, 0xffffff, 1 );
-// hemiLight.color.setHSL( 0.6, 1, 0.6 );
-// hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
-// hemiLight.position.set( 0, 50, 0 );
-// scene.add( hemiLight );
+// Floor
+const floor = new Mesh(
+    new PlaneGeometry( 10000, 10000 ),
+    new MeshPhongMaterial( { color: 0x444444, shininess: 100 } ),
+);
+floor.position.set( 0, -50, 0 );
+floor.rotateX( -Math.PI * 0.5 );
+floor.receiveShadow = true;
+scene.add( floor );
+
+
+const hemiLight = new HemisphereLight( 0xffffff, 0x000000, 0.1 );
+hemiLight.position.set( 0, 1, 0 );
+scene.add( hemiLight );
+
+const ambientLight = new AmbientLight( 0x220455, 0.1 );
+scene.add( ambientLight );
+
+const spotlight = new SpotLight( 0xffffff, 3, 250, 0.6, 0.5, 0 );
+spotlight.position.set( 50, 100, 0 );
+spotlight.lookAt( scene.position );
+spotlight.castShadow = true;
+spotlight.shadow.camera.near = 1;
+spotlight.shadow.camera.far = 250;
+spotlight.shadow.camera.fov = 50;
+// scene.add( spotlight );
 // ------------------
 // End lighting tests
 // ------------------
 
+const shadowCastingSphere = new Mesh(
+    new SphereGeometry( 4 ),
+    new MeshLambertMaterial( { color: 0xffffff } )
+);
+
+shadowCastingSphere.position.y = 10;
+shadowCastingSphere.position.z = 50;
+shadowCastingSphere.castShadow = true;
+scene.add( shadowCastingSphere );
 
 
 const pointsRenderer = new PointsRenderer( compute );
 scene.add( pointsRenderer.mesh );
+console.log( pointsRenderer );
 
-// const meshGeometry = new BoxGeometry( 10, 10, 10 );
+// // const meshGeometry = new BoxGeometry( 1, 1, 1 );
+// const meshGeometry = new SphereGeometry( 2, 6, 6 );
 // const meshRenderer = new MeshRenderer( compute, meshGeometry );
 // scene.add( meshRenderer.mesh );
+
+
+
+
+
+// Effect Composer
+// ---------------
+// const renderScene = new RenderPass( scene, camera );
+
+// // const bokehPass = new BokehPass( scene, camera, {
+// //     focus: 1.0,
+// //     aperture: 0.025,
+// //     maxblur: 0.01
+// // } );
+
+// const taaRenderPass = new TAARenderPass( scene, camera );
+// taaRenderPass.sampleLevel = 3;
+// taaRenderPass.clearColor = 0x000000;
+// taaRenderPass.clearAlpha = 1;
+// // taaRenderPass.accumulate = true;
+// // taaRenderPass.unbiased = false;
+
+// const bloomPass = new UnrealBloomPass(
+//     new Vector2( window.innerWidth * 2, window.innerHeight * 2 ),
+//     0.25, // strength
+//     0.1, // radius
+//     0.1 // threshold
+// );
+
+// const outputPass = new OutputPass();
+
+// const composer = new EffectComposer( renderer );
+// composer.addPass( renderScene );
+// // composer.addPass( bokehPass );
+// composer.addPass( taaRenderPass );
+// composer.addPass( bloomPass );
+// composer.addPass( outputPass );
+
+
 
 
 let previousTime = 0;
@@ -153,15 +195,11 @@ function tick( time: DOMHighResTimeStamp ) {
 
     controls.update( dt );
 
-    // camera.position.x = Math.sin( t * 0.5 ) * 1500;
-    // camera.position.z = Math.cos( t * 0.5 ) * 1500;
-
-    // Move the lights around...
-    // testSphere.position.y = Math.sin( t * 0.6 ) * 500;
-    // pointLight.position.copy( testSphere.position );
-
-    // dirLight.position.x = Math.sin( t ) * 100;
-    // dirLight.position.z = Math.cos( t ) * 100;
+    emitter1.positionInitial.origin.set(
+        Math.sin( t * 0.5 ) * 50,
+        10 + Math.sin( t * 2 ) * 10,
+        Math.cos( t * 0.5 ) * 50
+    );
 
     // Compute the GPGPU textures
     compute.update( dt, manualTime );
@@ -172,6 +210,7 @@ function tick( time: DOMHighResTimeStamp ) {
 
     // Render the scene
     renderer.render( scene, camera );
+    // composer.render( dt );
 
     ++frameNumber;
 }

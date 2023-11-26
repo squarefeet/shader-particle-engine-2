@@ -11,6 +11,7 @@ import {
     MeshPhongMaterial,
     PCFSoftShadowMap,
     PlaneGeometry,
+    PointLight,
     SphereGeometry,
     SpotLight,
     Vector3,
@@ -89,6 +90,10 @@ scene.add( new DirectionalLightHelper( dirLight, 10 ) );
 const helper = new CameraHelper( dirLight.shadow.camera );
 scene.add( helper );
 
+const pointLight = new PointLight( 0x00ff00, 2, 500, 0.1 );
+pointLight.position.set( 0, 50, 50 );
+pointLight.castShadow = true;
+scene.add( pointLight );
 
 // Floor
 const floor = new Mesh(

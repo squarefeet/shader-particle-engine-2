@@ -1,4 +1,4 @@
-import { DataTexture, HalfFloatType, IUniform, Material, Mesh, MeshBasicMaterial, PlaneGeometry, Scene, Texture, Vector2, Vector3, WebGLRenderer } from "three";
+import { DataTexture, DepthFormat, DepthTexture, HalfFloatType, IUniform, Material, Matrix3, Matrix4, Mesh, MeshBasicMaterial, NearestFilter, PlaneGeometry, Scene, Texture, UnsignedInt248Type, Vector2, Vector3, WebGLRenderTarget, WebGLRenderer } from "three";
 import { Emitter } from "./Emitter";
 import { GPUComputationRenderer, Variable } from "three/examples/jsm/Addons.js";
 import { TextureUniformName, TextureName } from "./constants/textures";
@@ -35,10 +35,24 @@ export class ParticleEngineCompute {
     };
 
     // Uniforms common to all compute shaders
-    commonUniforms = {
+    commonUniforms: Record<string, IUniform> = {
         // uTime consists of vec2( deltaTime, runTime )
         uTime: { value: new Vector2() },
         uEmitterIndexRange: this.emitterStore.uniformsSpawn.uEmitterIndexRange,
+        tDepth: { value: null },
+        tNormal: { value: null },
+        cameraNear: { value: 0 },
+        cameraFar: { value: 100 },
+        cameraPosition: { value: null },
+        projectionMatrix: { value: new Matrix4() },
+        modelViewMatrix: { value: new Matrix4() },
+        uProjectionMatrix: { value: new Matrix4() },
+        uInvProjectionMatrix: { value: new Matrix4() },
+        uModelViewMatrix: { value: new Matrix4() },
+        uInvModelViewMatrix: { value: new Matrix4() },
+        uInvViewMatrix: { value: new Matrix4() },
+        uScreenResolution: { value: new Vector2() },
+        uNormalMatrix: { value: new Matrix3() },
     };
 
     debugPlanes: Record<TextureName, ComputeDebugPlaneMesh | null> = {
@@ -175,7 +189,7 @@ export class ParticleEngineCompute {
         // will change the value for all.
         // This is desirable as it saves assignment operations.
         Object.entries( this.commonUniforms ).forEach( ( [ uniformName, unifomValue ] ) => {
-            positionUniforms[ uniformName ] = 
+            positionUniforms[ uniformName ] =
                 velocityUniforms[ uniformName ] =
                     spawnUniforms[ uniformName ] = unifomValue;
         } );
@@ -235,7 +249,7 @@ export class ParticleEngineCompute {
 
     setPositionBufferAttribute(): void {
         if(
-            this.bufferAttributes.position instanceof Float32Array && 
+            this.bufferAttributes.position instanceof Float32Array &&
             this.particleCount * 3 === this.bufferAttributes.position.length
         ) {
             return;
@@ -246,7 +260,7 @@ export class ParticleEngineCompute {
 
     setUVBufferAttribute(): void {
         if(
-            this.bufferAttributes.uvs instanceof Float32Array && 
+            this.bufferAttributes.uvs instanceof Float32Array &&
             this.particleCount * 2 === this.bufferAttributes.uvs.length
         ) {
             return;
@@ -260,11 +274,11 @@ export class ParticleEngineCompute {
             const x = ( i % textureSize ) / textureSize;
             const y = ~~( i / textureSize ) / textureSize;
             const i2 = i * 2;
-            
+
             uvs[ i2 + 0 ] = x;
             uvs[ i2 + 1 ] = y;
         }
-        
+
         this.bufferAttributes.uvs = uvs;
     }
 
@@ -332,7 +346,7 @@ export class ParticleEngineCompute {
         };
     }
 
-    assignEmitterUniforms(): void {
+    private assignEmitterUniforms(): void {
          // Assign texture-specific uniforms, using the emitter's `uniforms` getter
         // as the source. This is a bit messy at the moment, so optimise this
         // in the future...
@@ -370,7 +384,7 @@ export class ParticleEngineCompute {
 
         console.log( this.dataTextureVariables[ TextureName.POSITION ]?.material.uniforms );
 
-        
+
     }
 
     // OPTIMISE
@@ -415,10 +429,10 @@ export class ParticleEngineCompute {
                     color: 0x999999,
                 } )
             );
-            
+
             debugPlane.position.x = positionX;
             scene.add( debugPlane );
-            
+
             this.debugPlanes[ key ] = debugPlane;
             positionX -= size;
         } );

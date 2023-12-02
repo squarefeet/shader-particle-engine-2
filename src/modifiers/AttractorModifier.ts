@@ -1,4 +1,4 @@
-import { Matrix4, Vector3, Vector4 } from 'three';
+import { Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, Scene, SphereGeometry, Vector3, Vector4 } from 'three';
 import { Modifier } from './Modifier';
 import { ModifierBitFlags } from './bit-flags';
 
@@ -50,5 +50,20 @@ export class AttractorModifier extends Modifier<Matrix4> {
         this.value.elements[ start + 1 ] = 0;
         this.value.elements[ start + 2 ] = 0;
         this.value.elements[ start + 3 ] = 0;
+    }
+
+    addAttractorsToScene( scene: Scene ): void {
+        this.attractors.forEach( attractor => {
+            const sphere = new Mesh(
+                new SphereGeometry( 2 ),
+                new MeshLambertMaterial( { color: 0xffffff } )
+            );
+
+            sphere.position.x = attractor.x;
+            sphere.position.y = attractor.y;
+            sphere.position.z = attractor.z;
+
+            scene.add( sphere );;
+        } );
     }
 }

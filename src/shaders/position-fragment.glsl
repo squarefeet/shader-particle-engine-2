@@ -3,6 +3,123 @@
 
 // Common uniforms
 uniform vec2 uTime;
+uniform float cameraNear;
+uniform float cameraFar;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat4 uProjectionMatrix;
+uniform mat4 uInvProjectionMatrix;
+uniform mat4 uModelViewMatrix;
+uniform mat4 uInvModelViewMatrix;
+uniform mat4 uInvViewMatrix;
+uniform vec2 uScreenResolution;
+uniform sampler2D tDepth;
+uniform sampler2D tNormal;
+
+
+#include <packing>
+float readDepth( vec2 coord ) {
+    float fragCoordZ = texture2D( tDepth, coord ).x;
+    float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+    return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+    // return viewZ;
+}
+ // Transform a worldspace coordinate to a clipspace coordinate
+vec4 worldToClip( vec3 v, mat4 mvpMatrix ) {
+    return mvpMatrix * vec4( v, 1.0 );
+}
+
+// Transform a clipspace coordinate to a screenspace one.
+vec3 clipToScreen( vec4 v ) {
+    return vec3( v.x, v.y, v.z ) / ( v.w );
+}
+
+// Transform a screenspace coordinate to a 2d vector for
+// use as a texture UV lookup.
+vec2 screenToUV( vec2 v ) {
+    return vec2( v.xy ) * 0.5 + vec2(0.5);
+}
+
+vec3 worldToScreen( vec3 v ) {
+    vec4 clip = worldToClip( v, uProjectionMatrix * uModelViewMatrix );
+    return clipToScreen( clip );
+}
+
+vec2 worldToUV( vec3 v ) {
+    return screenToUV( worldToScreen( v ).xy );
+}
+
+vec3 worldPosFromDepth( vec2 uv, float depth ) {
+    float z = depth * 2.0 - 1.0;
+    // float z = depth;
+
+    vec4 clipSpacePosition = vec4( uv * 2.0 - 1.0, z, 1.0 );
+    // vec4 clipSpacePosition = vec4( uv, z, 1.0 );
+    vec4 viewSpacePosition = uInvProjectionMatrix * clipSpacePosition;
+
+    // Perspective division
+    viewSpacePosition /= viewSpacePosition.w;
+
+    vec4 worldSpacePosition = uInvViewMatrix * viewSpacePosition;
+
+    return worldSpacePosition.xyz;
+}
+
+vec3 worldPos( vec2 uv ) {
+    float depth = readDepth( uv );
+    return worldPosFromDepth( uv, depth );
+}
+
+// naive way of computing the normal
+// Adapted from: https://www.shadertoy.com/view/fsVczR
+// Via: https://atyuwen.github.io/posts/normal-reconstruction/
+vec3 computeNormalNaive( vec2 coord ) {
+    vec2 uvUnit = vec2( 1.0 ) / uScreenResolution;
+
+    vec3 l1 = worldPos( coord - vec2( uvUnit.x, 0.0 ) );
+    vec3 r1 = worldPos( coord + vec2( uvUnit.x, 0.0 ) );
+    vec3 t1 = worldPos( coord + vec2( 0.0, uvUnit.y ) );
+    vec3 b1 = worldPos( coord - vec2( 0.0, uvUnit.y ) );
+
+    vec3 dpdx = r1 - l1;
+    vec3 dpdy = t1 - b1;
+
+    return normalize( cross( dpdx, dpdy ) );
+}
+
+// Adapted from: https://www.shadertoy.com/view/fsVczR
+// Via: https://atyuwen.github.io/posts/normal-reconstruction/
+vec3 computeNormalImproved( vec2 uv ) {
+    vec2 uvUnit = vec2( 1.0 ) / uScreenResolution;
+
+    float c0Depth = readDepth( uv );
+    float l2Depth = readDepth( uv - vec2( uvUnit.x * 2.0, 0.0 ) );
+    float l1Depth = readDepth( uv - vec2( uvUnit.x * 1.0, 0.0 ) );
+    float r1Depth = readDepth( uv + vec2( uvUnit.x * 1.0, 0.0 ) );
+    float r2Depth = readDepth( uv + vec2( uvUnit.x * 2.0, 0.0 ) );
+    float b2Depth = readDepth( uv - vec2( 0.0, uvUnit.y * 2.0 ) );
+    float b1Depth = readDepth( uv - vec2( 0.0, uvUnit.y * 1.0 ) );
+    float t1Depth = readDepth( uv + vec2( 0.0, uvUnit.y * 1.0 ) );
+    float t2Depth = readDepth( uv + vec2( 0.0, uvUnit.y * 2.0 ) );
+
+    float dl = abs( l1Depth * l2Depth / ( 2.0 * l2Depth - l1Depth ) - c0Depth );
+    float dr = abs( r1Depth * r2Depth / ( 2.0 * r2Depth - r1Depth ) - c0Depth );
+    float db = abs( b1Depth * b2Depth / ( 2.0 * b2Depth - b1Depth ) - c0Depth );
+    float dt = abs( t1Depth * t2Depth / ( 2.0 * t2Depth - t1Depth ) - c0Depth );
+
+    vec3 ce = worldPosFromDepth( uv, c0Depth );
+
+    vec3 dpdx = ( dl < dr ) ?
+        ce - worldPosFromDepth( uv - vec2( uvUnit.x, 0.0 ), l1Depth ) :
+        -ce + worldPosFromDepth( uv + vec2( uvUnit.x, 0.0 ), r1Depth );
+
+    vec3 dpdy = ( db < dt ) ?
+        ce - worldPosFromDepth( uv - vec2( 0, uvUnit.y ), b1Depth ) :
+        -ce + worldPosFromDepth( uv + vec2( 0, uvUnit.y ), t1Depth );
+
+    return normalize( cross( dpdx, dpdy ) );
+}
+
 
 // Compute texture uniforms are added by GPUComputationRenderer
 // uniform sampler2D tPosition;
@@ -266,5 +383,81 @@ void main() {
 
     position = applyModifiers( position, velocity, spawnTextureValue );
 
-    gl_FragColor = vec4( position, size * alive );
+    // vec3 collisionSpherePos = vec3( 0.0, 5.0, 0.0 );
+    // float collisionSphereRadius = 5.0;
+
+    // // vec3 dPos = collisionSpherePos - ( position + velocity * uTime.x );
+    // vec3 dPos = collisionSpherePos - position;
+    // float distanceToCollisionSphere = length( dPos );
+
+    // if( abs( distanceToCollisionSphere ) <= collisionSphereRadius ) {
+    //     position = positionTextureValue.xyz;
+    // }
+
+    mat4 mvpMatrix = uProjectionMatrix * uModelViewMatrix;
+
+    vec4 particleClipSpace = worldToClip( position, mvpMatrix );
+    vec2 particleDepthUV = worldToUV( position );
+
+    // 0 is cameraNear, 1 is cameraFar
+    float sceneDepthAtPosition = readDepth( particleDepthUV );
+
+    // 0 is cameraNear, -1 is cameraFar
+    float particleDepth = -viewZToOrthographicDepth( particleClipSpace.z, cameraNear, cameraFar );
+    float dist = sceneDepthAtPosition - particleDepth;
+    float depthUnit = 1.0 / (cameraFar - cameraNear);
+
+    size = 1.0;
+
+    if( dist < depthUnit * 10.0 ) {
+        vec3 particleNormal = normalize( ( mvpMatrix * texture2D( tNormal, particleDepthUV ) ).xyz );
+        // vec3 particleNormal = computeNormalImproved( particleDepthUV );
+        // vec3 cameraPositionNormalised = normalize( cameraPosition );
+
+        // vec3 vel = reflect( velocityTextureValue.xyz, particleNormal );
+        // vec3 vel = reflect( particleNormal, vec3( 0.0, 0.0, 1.0 ) );
+        // vec3 vel = cross( cameraPositionNormalised, particleNormal );
+
+        rng_state = uint( particleDepthUV );
+        vec3 randomVel = vec3( PCGHash(), PCGHash(), PCGHash() ) / float( 0xFFFFFFFFU );
+
+        vec3 vel = reflect( velocityTextureValue.xyz, particleNormal );
+        vel += randomVel * 5.0;
+
+        // position = positionTextureValue.xyz + ( vel * 0.016 );
+        // position = positionTextureValue.xyz + ( ( vel * uTime.x ) );
+        // position = positionTextureValue.xyz + ( ( vel * 0.016 ) );
+        position = positionTextureValue.xyz;
+
+        // position -= velocity * uTime.x;
+        // position = positionTextureValue.xyz + ( particleNormal * 0.016 );
+
+
+        // vec2 eps = vec2(1.0) / uScreenResolution;
+
+        // vec2 proj_tc1 = particleDepthUV + vec2(eps.x, 0.0);
+        // vec2 proj_tc2 = particleDepthUV + vec2(0.0, eps.y);
+
+        // vec3 p0 = worldPos(particleDepthUV);
+        // vec3 p1 = worldPos(proj_tc1);
+        // vec3 p2 = worldPos(proj_tc2);
+
+        // // vec3 n = mat3(uInvModelViewMatrix) * normalize(cross(p1.xyz - p0.xyz, p2.xyz - p0.xyz));
+        // vec3 n = computeNormalImproved( particleDepthUV );
+        // vec3 r = reflect(velocityTextureValue.xyz, n);
+
+        // position += n * 1e-4;
+        // vec3 velocity = r * 0.3 + cos( position * 1e5 ) * 5e-4;
+        // // vel += inverseVel * 0.5;
+
+        // position += velocity * -1.0;
+    }
+
+    gl_FragColor = vec4(
+        position.xy,
+        position.z,
+        // sceneDepthAtPosition,
+        // particleDepth,
+        size * alive
+    );
 }

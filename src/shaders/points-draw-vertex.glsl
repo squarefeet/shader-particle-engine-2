@@ -116,12 +116,8 @@ void main() {
 	#include <logdepthbuf_vertex>
 	#include <clipping_planes_vertex>
 
-
     vViewPosition = -mvPosition.xyz;
-
-    // gl_PointSize = posSize / length( mvPosition.xyz );
     gl_PointSize = posSize * ( 300.0 / -mvPosition.z );
-    // gl_Position = projectionMatrix * mvPosition;
 
     #include <worldpos_vertex>
 	#include <envmap_vertex>

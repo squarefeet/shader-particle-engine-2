@@ -3,6 +3,73 @@
 
 // Common uniforms
 uniform vec2 uTime;
+uniform float cameraNear;
+uniform float cameraFar;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat4 uProjectionMatrix;
+uniform mat4 uInvProjectionMatrix;
+uniform mat4 uModelViewMatrix;
+uniform mat4 uInvModelViewMatrix;
+uniform mat4 uInvViewMatrix;
+uniform vec2 uScreenResolution;
+uniform sampler2D tDepth;
+uniform sampler2D tNormal;
+uniform mat3 uNormalMatrix;
+
+#include <packing>
+float readDepth( vec2 coord ) {
+    float fragCoordZ = texture2D( tDepth, coord ).x;
+    float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+    return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+    // return viewZ;
+}
+
+ // Transform a worldspace coordinate to a clipspace coordinate
+vec4 worldToClip( vec3 v, mat4 mvpMatrix ) {
+    return mvpMatrix * vec4( v, 1.0 );
+}
+
+// Transform a clipspace coordinate to a screenspace one.
+vec3 clipToScreen( vec4 v ) {
+    return vec3( v.x, v.y, v.z ) / ( v.w );
+}
+
+// Transform a screenspace coordinate to a 2d vector for
+// use as a texture UV lookup.
+vec2 screenToUV( vec2 v ) {
+    return vec2( v.xy ) * 0.5 + vec2(0.5);
+}
+
+vec3 worldToScreen( vec3 v ) {
+    vec4 clip = worldToClip( v, uProjectionMatrix * uModelViewMatrix );
+    return clipToScreen( clip );
+}
+
+vec2 worldToUV( vec3 v ) {
+    return screenToUV( worldToScreen( v ).xy );
+}
+
+vec3 worldPosFromDepth( vec2 uv, float depth ) {
+    float z = depth * 2.0 - 1.0;
+    // float z = depth;
+
+    vec4 clipSpacePosition = vec4( uv * 2.0 - 1.0, z, 1.0 );
+    // vec4 clipSpacePosition = vec4( uv, z, 1.0 );
+    vec4 viewSpacePosition = uInvProjectionMatrix * clipSpacePosition;
+
+    // Perspective division
+    viewSpacePosition /= viewSpacePosition.w;
+
+    vec4 worldSpacePosition = uInvViewMatrix * viewSpacePosition;
+
+    return worldSpacePosition.xyz;
+}
+
+vec3 worldPos( vec2 uv ) {
+    float depth = readDepth( uv );
+    return worldPosFromDepth( uv, depth );
+}
 
 // Compute textures are added by GPUComputationRenderer
 // uniform sampler2D tVelocity;
@@ -242,12 +309,17 @@ const uint MOD_ATTRACTOR_FLAG = 1u << 3;
             vec3 dPos = attractor.xyz - position;
             float distance = length( dPos );
 
+            if( distance < 1.0 ) continue;
+
             float distanceSq = distance * distance;
             float attractionForce = force / distanceSq;
+
+            // if( attractionForce > 10.0 ) continue;
 
             attraction += attractionForce * normalize( dPos );
         }
 
+        // return clamp( attraction, vec3( -50.0 ), vec3( 50.0 ) );
         return attraction;
     }
 #endif
@@ -430,7 +502,7 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
 
             #ifdef MOD_ATTRACTORS
                 if( ( modifierBitMask & MOD_ATTRACTOR_FLAG ) != 0u ) {
-                    velocity += calculateAttractors( position, uModAttractors[ i ] ) * deltaTime;
+                    velocity += calculateAttractors( position, uModAttractors[ i ] );
                 }
             #endif
 
@@ -449,7 +521,77 @@ vec3 applyModifiers( vec3 velocity, vec4 spawn, vec3 position ) {
                 }
             #endif
 
-            // velocity = clamp( velocity, vec3( -100.0 ), vec3( 100.0 ) );
+            // velocity = clamp( velocity, vec3( -20.0 ), vec3( 20.0 ) );
+
+            // vec3 collisionSpherePos = vec3( 0.0, 5.0, 0.0 );
+            // float collisionSphereRadius = 5.0;
+
+            // vec3 dPos = ( position + ( velocity * deltaTime ) ) - collisionSpherePos;
+            // float distanceToCollisionSphere = length( dPos );
+
+            // if( abs( distanceToCollisionSphere ) <= collisionSphereRadius ) {
+            //     // position = positionTextureValue.xyz;
+            //     velocity = normalize( dPos ) * length( velocity ) * 0.5;
+            //     // velocity = ( velocity * normalize( dPos ) );
+            //     // velocity = vec3( 0.0, 10.0, 0.0 );
+            // }
+
+
+            // mat4 mvpMatrix = uProjectionMatrix * uModelViewMatrix;
+            // vec4 particleClipSpace = worldToClip( position, mvpMatrix );
+            // vec3 particleScreenPosition = clipToScreen( particleClipSpace );
+            // vec2 particleDepthUV = screenToUV( particleScreenPosition.xy );
+
+            // float sceneDepthAtPosition = readDepth( tDepth, particleDepthUV ); // 0 to 1
+
+            // vec4 adjustedParticleClipSpace = worldToClip( position - cameraPosition, mvpMatrix );
+            // float particleDepth = getParticleDepth( adjustedParticleClipSpace, cameraNear, cameraFar );
+            // float dist = abs(particleDepth - sceneDepthAtPosition);
+
+            // if( dist < (1.0 / (cameraFar - cameraNear)) * 5.0 ) {
+            //     vec2 proj_tc0 = particleClipSpace.xy / particleClipSpace.w * 0.5 + vec2(0.5);
+
+            //     vec2 eps = vec2(1.0) / uScreenResolution.xy;
+
+            //     vec2 proj_tc1 = proj_tc0 + vec2(eps.x, 0.0);
+            //     vec2 proj_tc2 = proj_tc0 + vec2(0.0, eps.y);
+
+            //     vec3 p0 = vsPointForCoord(proj_tc0);
+            //     vec3 p1 = vsPointForCoord(proj_tc1);
+            //     vec3 p2 = vsPointForCoord(proj_tc2);
+
+            //     vec3 n = mat3(uInvModelViewMatrix) * normalize(cross(p1.xyz - p0.xyz, p2.xyz - p0.xyz));
+            //     vec3 r = reflect(velocity, n);
+            //     vec3 inverseVel = velocity * -0.6;
+
+            //     position += n * 1e-4;
+            //     velocity = r * 0.3 + cos(position * 1e5) * 5e-4;
+            //     velocity += inverseVel * 1.0;
+            // }
+
+            mat4 mvpMatrix = uProjectionMatrix * uModelViewMatrix;
+            vec4 particleClipSpace = worldToClip( position, mvpMatrix );
+            vec2 particleDepthUV = worldToUV( position );
+
+            // 0 is cameraNear, 1 is cameraFar
+            float sceneDepthAtPosition = readDepth( particleDepthUV );
+
+            // 0 is cameraNear, -1 is cameraFar
+            float particleDepth = -viewZToOrthographicDepth( particleClipSpace.z, cameraNear, cameraFar );
+            float dist = sceneDepthAtPosition - particleDepth;
+            float depthUnit = 1.0 / (cameraFar - cameraNear);
+
+            if( dist < depthUnit * 5.0 ) {
+                // velocity = vec3( 0.0 );
+                vec2 screenUnit = 1.0 / uScreenResolution;
+                vec3 particleNormal = texture2D( tNormal, particleDepthUV ).xyz;
+
+                particleNormal.y *= -1.0;
+                particleNormal = normalize( uNormalMatrix * particleNormal );
+                velocity = reflect( velocity.xyz, particleNormal );
+                // velocity *= -1.0;
+                // velocity = particleNormal * 10.0;
+            }
         }
         else {
             velocity = vec3( 0.0 );

@@ -97,7 +97,7 @@ export class EmitterStore {
         }, {} as Record<string, IUniform> );
 
         Object.values( modifierUniforms ).forEach( ( uniform: IUniform ) => {
-            const existingValue = uniform.value.find( ( d: unknown ) => !!d );
+            const existingValue = uniform.value.find( ( d: unknown ) => d !== undefined );
 
             uniform.value = uniform.value.map( ( d: unknown ) => {
                 if( d ) {

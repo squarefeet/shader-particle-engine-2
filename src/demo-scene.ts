@@ -20,7 +20,7 @@ const camera = new PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
     1,
-    100000
+    200
 );
 const scene = new Scene();
 const renderer = new WebGLRenderer( {
@@ -30,10 +30,10 @@ const stats = new Stats();
 const controls = new OrbitControls( camera, renderer.domElement );
 
 // Setup those bits n bobs
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
+// controls.enableDamping = true;
+// controls.dampingFactor = 0.05;
 camera.position.y = 50;
-camera.position.x = 50;
+camera.position.x = 0;
 camera.position.z = 100;
 camera.position.multiplyScalar( 0.8 );
 camera.lookAt( new Vector3( 0, 0, 0 ) );

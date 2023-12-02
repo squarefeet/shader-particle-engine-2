@@ -20,7 +20,8 @@ export class PointsRenderer {
         this.material = new PointsMaterial();
 
         this.mesh = new Points( this.geometry, this.material );
-        this.mesh.matrixAutoUpdate = false;
+        // this.mesh.matrixAutoUpdate = false;
+        // this.mesh.matrixWorldAutoUpdate = true;
         this.mesh.frustumCulled = false;
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
